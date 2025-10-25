@@ -12,3 +12,8 @@ streamlit==1.39.0
 faiss-cpu==1.8.0.post1
 openai==1.51.2
 python-dotenv==1.0.1
+streamlit
+python-dotenv
+faiss-cpu
+sentence-transformers
+numpy

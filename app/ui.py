@@ -1,136 +1,93 @@
 # app/ui.py
-# رابط کاربری Streamlit برای منتور شخصی با حافظه مکالمه و لحن قابل انتخاب
-
 import os
-import textwrap
 from pathlib import Path
-import sys
+import textwrap
 
 import streamlit as st
 from dotenv import load_dotenv
 
-# اضافه کردن مسیر برای ایمپورت ماژول‌ها
-BASE_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(BASE_DIR / "app"))
-
-# ایمپورت اجزای داخلی
+from settings import UIConfig, DEFAULT_TOP_K, DEFAULT_EMBED_MODEL
 from retriever import Retriever
-from persona import SYSTEM_PERSONA, STYLE_PRESETS
-from memory import ChatMemory
 
-# پیکربندی صفحه
-load_dotenv()
-st.set_page_config(page_title="منتور شخصی", page_icon="🤖", layout="wide")
-st.title("🤖 منتور شخصی با حافظه و سبک پاسخ سفارشی")
+# ---- Bootstrap ----
+BASE_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BASE_DIR / ".env")
 
-# تنظیمات API
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+st.set_page_config(page_title="Amin Mentor", page_icon="🧠", layout="wide")
+cfg = UIConfig()
 
-# تنظیمات سایدبار
-with st.sidebar:
-    st.subheader("تنظیمات پاسخ")
-    if OPENAI_API_KEY:
-        st.success("حالت آنلاین (با مدل زبانی)")
-    else:
-        st.warning("حالت آفلاین (بدون کلید OpenAI)")
+# ---- Sidebar ----
+st.sidebar.title("⚙️ تنظیمات")
+mode = st.sidebar.radio("حالت پاسخ", ["آفلاین (بدون LLM)", "آنلاین (با LLM)"], index=0)
+top_k = st.sidebar.slider("تعداد نتایج بازیابی (k)", 1, 15, DEFAULT_TOP_K, 1)
+embed_model_name = st.sidebar.text_input("مدل امبدینگ", value=DEFAULT_EMBED_MODEL)
+openai_key = st.sidebar.text_input("OpenAI API Key (برای حالت آنلاین)", type="password")
 
-    top_k = st.slider("تعداد نتایج بازیابی‌شده", 3, 15, 5)
-    style_name = st.selectbox("سبک پاسخ", list(STYLE_PRESETS.keys()), index=0)
-    st.caption("ایندکس باید در پوشه faiss_index موجود باشد (index.faiss و meta.json).")
+st.sidebar.caption("ایندکس باید در `faiss_index/` حاضر باشد (index.faiss + meta.json).")
 
-# بارگذاری ایندکس
+# ---- Title ----
+st.title(cfg.title)
+st.write(cfg.description)
+
+# ---- Load retriever ----
+@st.cache_resource(show_spinner=True)
+def _get_retriever(name: str) -> Retriever:
+    return Retriever(embed_model=name)
+
 try:
-    retriever = Retriever()
+    retriever = _get_retriever(embed_model_name)
 except Exception as e:
-    st.error(
-        f"❌ خطا در بارگذاری ایندکس: {e}\n"
-        "ابتدا دستور زیر را اجرا کن:\n`python ingest/build_faiss.py`"
-    )
+    st.error(f"❌ خطا در بارگذاری ایندکس/مدل: {e}")
     st.stop()
 
-# حافظه مکالمه در Session State
-if "memory" not in st.session_state:
-    st.session_state["memory"] = ChatMemory()
-memory: ChatMemory = st.session_state["memory"]
+# ---- Query input ----
+col_q1, col_q2 = st.columns([4, 1])
+with col_q1:
+    query = st.text_input("❓ پرسش شما", placeholder="مثلاً: بهترین شیوه مذاکره در شرایط فشار زمانی چیست؟")
+with col_q2:
+    ask = st.button("جست‌وجو", use_container_width=True)
 
-# ورودی کاربر
-query = st.text_input("سؤالت یا موضوع موردنظر را بنویس:", placeholder="مثلاً: هدف مذاکره برد-برد چیست؟")
-ask = st.button("پرسیدن")
+# ---- Helper: Offline summarizer ----
+def offline_answer(query: str, hits):
+    # پاسخ خیلی ساده بر اساس قطعات بازیابی‌شده (بدون LLM)
+    if not hits:
+        return "موردی پیدا نشد."
+    joined = "\n\n".join([f"- {h['text']}" for h in hits])
+    answer = textwrap.shorten(joined, width=900, placeholder=" ...")
+    return f"**خلاصه‌ی سریع از متون مرتبط:**\n\n{answer}"
 
-# تابع تولید پاسخ با مدل زبانی
-def llm_answer(context: str, q: str, style_desc: str) -> str:
-    if not OPENAI_API_KEY:
-        return None  # حالت آفلاین
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-
-        history_text = memory.as_text()
-
-        prompt = f"""
-{SYSTEM_PERSONA}
-
-سبک پاسخ: {style_desc}
-
-گفتگوهای اخیر:
-{history_text if history_text else "—"}
-
-پرسش جدید: {q}
-
-متون مرتبط (Context):
-{context}
-
-دستورالعمل:
-- اگر پاسخ در متون نبود، بگو مطمئن نیستم و پیشنهاد مسیر جست‌وجو بده.
-- در پایان، یک گام عملی سریع (Action) پیشنهاد کن.
-"""
-
-        r = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        return r.choices[0].message.content
-
-    except Exception as e:
-        st.info(f"⚠️ مشکل در ارتباط با مدل زبانی: {e}")
-        return None
-
-# اجرا
+# ---- Main action ----
 if ask and query:
-    memory.add("user", query)
-
     with st.spinner("در حال جست‌وجوی اسناد مرتبط..."):
         hits = retriever.search(query, k=top_k)
 
     if not hits:
-        st.warning("هیچ سندی پیدا نشد. مطمئن شو پوشه data/ خالی نباشد و ایندکس ساخته شده باشد.")
+        st.warning("هیچ سندی پیدا نشد. پوشه `data/` را بررسی کن و اگر خالی است، فایل متنی اضافه کن و دوباره ایندکس بساز.")
     else:
-        col_ans, col_refs = st.columns([2, 1])
+        col_ans, col_refs = st.columns([2, 1], gap="large")
 
-        with col_refs:
-            st.subheader("📚 اسناد مرتبط")
-            for i, h in enumerate(hits, 1):
-                with st.expander(f"{i}. {h['source']} (score={h['score']:.3f})", expanded=(i == 1)):
-                    st.write(h["text"])
-
+        # Answer panel
         with col_ans:
-            st.subheader("💬 پاسخ منتور")
-            context = "\n\n".join([f"[منبع: {h['source']}]\n{h['text']}" for h in hits])
-            style_desc = STYLE_PRESETS.get(style_name, "")
-            answer = llm_answer(context, query, style_desc)
+            st.subheader("🧩 پاسخ")
+            if mode.startswith("آفلاین"):
+                st.markdown(offline_answer(query, hits))
+            else:
+                if not openai_key:
+                    st.info("برای حالت آنلاین، کلید OpenAI را در سایدبار وارد کن. فعلاً حالت آفلاین نمایش داده می‌شود.")
+                    st.markdown(offline_answer(query, hits))
+                else:
+                    # اینجا می‌تونی فراخوان LLM خودت را بنویسی (فعلاً ساده نگه می‌داریم)
+                    st.markdown(offline_answer(query, hits))
+                    st.caption("💡 اتصال LLM قابل افزودن است (تولید پاسخ نهایی بر اساس نتایج بازیابی‌شده).")
 
-            if not answer:
-                # حالت آفلاین: خلاصه‌سازی ساده از نتایج
-                bullets = []
-                for h in hits:
-                    snippet = h["text"].replace("\n", " ")
-                    snippet = textwrap.shorten(snippet, width=220, placeholder="…")
-                    bullets.append(f"• {snippet}")
-                answer = "\n".join(bullets)
-
-            st.write(answer)
-            memory.add("assistant", answer)
-
-st.caption("ساخته‌شده با ❤️ برای پروژه منتور شخصی | حافظه فعال + سبک پاسخ قابل تنظیم")
+        # References panel
+        with col_refs:
+            st.subheader("📎 منابع")
+            for i, h in enumerate(hits, 1):
+                with st.expander(f"{i}. {h.get('source','نامشخص')}  •  امتیاز: {h['score']:.3f}  •  chunk: {h.get('chunk_idx','-')}"):
+                    st.write(h.get("text", "—"))
+                    meta_line = []
+                    if h.get("path"): meta_line.append(f"`{h['path']}`")
+                    if h.get("source"): meta_line.append(f"source: **{h['source']}**")
+                    if meta_line:
+                        st.caption(" | ".join(meta_line))

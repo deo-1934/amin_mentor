@@ -1,134 +1,116 @@
 # ingest/build_faiss.py
-# ساخت ایندکس FAISS از فایل‌های متنی داخل پوشه data/
-# خروجی: D:/Amin_Mentor/faiss_index/index.faiss  +  meta.json
+# ساخت ایندکس FAISS از فایل‌های متنی داخل data/ + تولید meta.json
+# اجرا:  python ingest/build_faiss.py
 
 import os
 import json
 import glob
 from pathlib import Path
+from typing import List, Dict, Tuple
 
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 
-
-# ---------- تنظیم مسیرها ----------
+# ---------- مسیرها ----------
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 OUT_DIR = BASE_DIR / "faiss_index"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+INDEX_PATH = OUT_DIR / "index.faiss"
+META_PATH = OUT_DIR / "meta.json"
+
 # ---------- تنظیمات ----------
-EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-MAX_CHARS = int(os.getenv("CHUNK_MAX_CHARS", "800"))
-OVERLAP = int(os.getenv("CHUNK_OVERLAP", "120"))
-BATCH_SIZE = int(os.getenv("EMBED_BATCH", "64"))
+EMB_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+FILE_EXTS = ["*.txt", "*.md"]
+CHUNK_SIZE = 800           # تعداد کاراکتر
+CHUNK_OVERLAP = 120        # همپوشانی بین چانک‌ها
 
-# الگوهای فایل‌ ورودی
-FILE_EXTS = ("*.txt", "*.md", "*.srt", "*.vtt")
+# ---------- ابزارک‌ها ----------
+def read_text_file(path: Path) -> str:
+    return path.read_text(encoding="utf-8", errors="ignore")
 
+def iter_text_files() -> List[Path]:
+    files: List[Path] = []
+    for ext in FILE_EXTS:
+        files.extend([Path(p) for p in glob.glob(str(DATA_DIR / ext))])
+    return sorted(files)
 
-def chunk_text(text: str, max_chars: int = MAX_CHARS, overlap: int = OVERLAP):
-    """
-    متن را به چانک‌های همپوشان تقسیم می‌کند. از لوپ بی‌نهایت جلوگیری می‌شود.
-    """
-    text = text.strip().replace("\r", "")
-    if max_chars <= 0:
-        raise ValueError("max_chars must be > 0")
-
-    if overlap >= max_chars:
-        # برای پایداری اگر کسی overlap را بزرگ گذاشته بود، منطقی‌اش می‌کنیم
-        overlap = max_chars // 4
-
-    step = max_chars - overlap
+def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
+    text = text.strip()
+    if not text:
+        return []
     chunks = []
     i = 0
     n = len(text)
-
     while i < n:
-        end = min(i + max_chars, n)
-        chunk = text[i:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        if end == n:
-            break  # به انتهای متن رسیدیم
-        i += step  # با گام ثابت جلو برویم (نه بازگشت به عقب)
-
+        j = min(i + size, n)
+        chunks.append(text[i:j])
+        if j == n:
+            break
+        i = j - overlap
+        if i < 0:
+            i = 0
     return chunks
 
+def l2_normalize(mat: np.ndarray) -> np.ndarray:
+    norms = np.linalg.norm(mat, axis=1, keepdims=True) + 1e-12
+    return mat / norms
 
-def read_text_file(path: Path) -> str:
-    """
-    خواندن امن فایل‌های متنی با UTF-8 و نادیده‌گرفتن خطاهای کاراکتر.
-    """
-    return path.read_text(encoding="utf-8", errors="ignore")
+# ---------- بدنه اصلی ----------
+def build_corpus() -> Tuple[List[str], List[Dict]]:
+    texts, metas = [], []
+    files = iter_text_files()
+    if not files:
+        print(f"⚠️ هیچ فایل متنی در {DATA_DIR} پیدا نشد. ابتدا فایل‌هایی مثل .txt یا .md اضافه کن.")
+        return texts, metas
 
+    for fp in files:
+        raw = read_text_file(fp)
+        chunks = chunk_text(raw, CHUNK_SIZE, CHUNK_OVERLAP)
+        for idx, ch in enumerate(chunks):
+            texts.append(ch)
+            metas.append({
+                "source": fp.name,
+                "path": str(fp.relative_to(BASE_DIR)),
+                "chunk_idx": idx
+            })
 
-def build_corpus():
-    texts, sources = [], []
-    # جمع‌آوری فایل‌ها
-    found_any = False
-    for ext in FILE_EXTS:
-        for fp in glob.glob(str(DATA_DIR / ext)):
-            found_any = True
-            p = Path(fp)
-            raw = read_text_file(p)
-            for ch in chunk_text(raw):
-                texts.append(ch)
-                sources.append({"source": p.name})
-    if not found_any:
-        raise SystemExit(f"⚠️ No input files found in {DATA_DIR}. "
-                         f"Put .txt/.md/.srt/.vtt files there and rerun.")
+    print(f"✅ جمع‌آوری شد: {len(files)} فایل، {len(texts)} چانک")
+    return texts, metas
+
+def embed_texts(texts: List[str], model_name: str = EMB_MODEL_NAME) -> np.ndarray:
     if not texts:
-        raise SystemExit("⚠️ Files were found but produced no chunks. "
-                         "Check CHUNK_MAX_CHARS/CHUNK_OVERLAP or file encoding.")
-    return texts, sources
+        return np.empty((0, 384), dtype="float32")
+    model = SentenceTransformer(model_name)
+    emb = model.encode(texts, batch_size=64, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True)
+    # اگر normalize_embeddings=True باشد، IP ≡ cosine خواهد شد.
+    return emb.astype("float32")
 
+def build_faiss(embs: np.ndarray) -> faiss.Index:
+    if embs.size == 0:
+        raise RuntimeError("هیچ برداری برای ایندکس وجود ندارد (corpus خالی است).")
+    dim = embs.shape[1]
+    index = faiss.IndexFlatIP(dim)  # Inner Product (با نرمال‌سازی = cosine similarity)
+    index.add(embs)
+    return index
 
 def main():
-    print(f"📂 DATA_DIR: {DATA_DIR}")
-    print(f"📦 OUT_DIR : {OUT_DIR}")
-    print(f"🔤 MODEL   : {EMBED_MODEL}")
-    print(f"🧩 chunk   : max={MAX_CHARS}, overlap={OVERLAP}, batch={BATCH_SIZE}")
+    print("🚧 شروع ساخت ایندکس...")
+    texts, metas = build_corpus()
+    if not texts:
+        return
 
-    texts, sources = build_corpus()
+    embs = embed_texts(texts, EMB_MODEL_NAME)
+    index = build_faiss(embs)
 
-    # مدل امبدینگ
-    model = SentenceTransformer(EMBED_MODEL)
+    faiss.write_index(index, str(INDEX_PATH))
+    META_PATH.write_text(json.dumps({"texts": texts, "sources": metas}, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # امبدینگ‌ها را در بچ‌ها محاسبه کنیم تا حافظه مدیریت شود
-    embs_list = []
-    total = len(texts)
-    for start in range(0, total, BATCH_SIZE):
-        end = min(start + BATCH_SIZE, total)
-        batch = texts[start:end]
-        emb = model.encode(batch, convert_to_numpy=True, show_progress_bar=False)
-        embs_list.append(emb)
-        print(f"… embedded {end}/{total}")
-
-    embs = np.vstack(embs_list).astype(np.float32)
-
-    # نرمال‌سازی برای cosine (dot-product با IndexFlatIP)
-    norms = np.linalg.norm(embs, axis=1, keepdims=True) + 1e-10
-    embs = embs / norms
-
-    # ساخت ایندکس و افزودن
-    index = faiss.IndexFlatIP(embs.shape[1])
-    index.add(embs)
-
-    # ذخیره ایندکس و متا
-    index_path = OUT_DIR / "index.faiss"
-    meta_path = OUT_DIR / "meta.json"
-
-    faiss.write_index(index, str(index_path))
-    meta_path.write_text(
-        json.dumps({"texts": texts, "sources": sources}, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-    print(f"✅ Indexed {len(texts)} chunks → {index_path}")
-    print(f"📝 Meta saved → {meta_path}")
-
+    print(f"🎯 ایندکس ذخیره شد → {INDEX_PATH}")
+    print(f"📝 متادیتا ذخیره شد → {META_PATH}")
+    print("✅ تمام.")
 
 if __name__ == "__main__":
     main()
