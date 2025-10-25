@@ -1,0 +1,76 @@
+﻿# ==============================
+# Python Project .gitignore
+# ==============================
+
+# Byte-compiled / cached / virtualenv files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables / sensitive files
+.env
+.env.*
+*.sqlite3
+*.db
+*.log
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter / notebooks / temp
+.ipynb_checkpoints
+*.ipynb
+
+# Tests / coverage
+.coverage
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Docker / Infra
+docker-compose.override.yml
+*.pid
+
+# Data / cache / temporary
+*.csv
+*.json
+*.tmp
+*.bak
+*.old
+*.orig
+
+# System files
+.DS_Store
+Thumbs.db
