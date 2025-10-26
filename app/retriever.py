@@ -7,7 +7,7 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from .settings import INDEX_DIR, DEFAULT_EMBED_MODEL
+from app.settings import INDEX_DIR, DEFAULT_EMBED_MODEL
 
 class Retriever:
     def __init__(self, embed_model: str = DEFAULT_EMBED_MODEL):

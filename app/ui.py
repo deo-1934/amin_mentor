@@ -1,4 +1,4 @@
-from retriever import retrieve
+from app.retriever import retrieve
 from generator import generate_response
 import os
 
