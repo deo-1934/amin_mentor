@@ -53,15 +53,21 @@ def generate_answer(user_query: str, k: int = 5, temperature: float = 0.3) -> Di
     ]
     ctx_text, sources = _format_context(chunks) if chunks else ("", [])
 
-    # 2) LLM
+    # 2) build messages
     messages = _build_messages(user_query, ctx_text)
+
+    # 3) call Hugging Face (OpenAI-compatible)
     resp = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=temperature,
     )
 
-    answer = resp.choices[0].message.content.strip()
+    # 4) extract text safely (supports both OpenAI & HF formats)
+    msg = resp.choices[0].message
+    answer = getattr(msg, "content", None) or getattr(msg, "text", "")
+    answer = str(answer).strip()
+
     return {
         "answer": answer,
         "sources": sources,
