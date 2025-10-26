@@ -45,7 +45,7 @@ def generate_answer(user_query: str, k: int = 5, temperature: float = 0.3) -> Di
     client = get_openai_client()
     model = get_model_name()
 
-    # 1) retrieve
+    # 1) retrieve context
     hits = retriever.search(user_query, k=k)
     chunks = [
         {"text": h.text, "score": h.score, "metadata": h.metadata}
@@ -63,9 +63,41 @@ def generate_answer(user_query: str, k: int = 5, temperature: float = 0.3) -> Di
         temperature=temperature,
     )
 
-    # 4) extract text safely (supports both OpenAI & HF formats)
-    msg = resp.choices[0].message
-    answer = getattr(msg, "content", None) or getattr(msg, "text", "")
+    # 4) extract text safely across providers
+    raw_choice = resp.choices[0]
+    msg = getattr(raw_choice, "message", None) or {}
+
+    if isinstance(msg, dict):
+        content = msg.get("content")
+        if isinstance(content, str):
+            answer = content
+        elif isinstance(content, list):
+            parts = []
+            for p in content:
+                if isinstance(p, dict):
+                    if "text" in p and isinstance(p["text"], str):
+                        parts.append(p["text"])
+                    elif "content" in p and isinstance(p["content"], str):
+                        parts.append(p["content"])
+                    elif "data" in p and isinstance(p["data"], str):
+                        parts.append(p["data"])
+                elif isinstance(p, str):
+                    parts.append(p)
+            answer = "".join(parts)
+        else:
+            answer = getattr(raw_choice, "text", "") or ""
+    else:
+        content = getattr(msg, "content", None)
+        if isinstance(content, str):
+            answer = content
+        elif isinstance(content, list):
+            answer = "".join(
+                (getattr(part, "text", None) or getattr(part, "content", "") or str(part))
+                for part in content
+            )
+        else:
+            answer = getattr(raw_choice, "text", "") or ""
+
     answer = str(answer).strip()
 
     return {
