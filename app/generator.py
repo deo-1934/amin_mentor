@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import List, Dict, Any, Tuple
 import textwrap
+import json
 
 from .deps import get_retriever, get_openai_client, get_model_name
 
@@ -38,73 +39,43 @@ def _build_messages(user_query: str, ctx_text: str) -> List[Dict[str, str]]:
         {"role": "user", "content": prompt},
     ]
 
-def _extract_text_from_choice(choice: Any) -> str:
+def _extract_text_from_resp_dict(resp_dict: Dict[str, Any]) -> str:
     """
-    سازگار با چندین فرمت پاسخ:
-    - OpenAI SDK: choice.message.content (str|list[parts])
-    - HF Router (openai-compatible): choice.message.content -> list of dicts [{'type':'text','text':...}, ...]
-    - برخی ارائه‌دهنده‌ها: choice.text
-    - یا حتی ساختارهای دیکشنری
+    استخراج متن سازگار با HF Router (OpenAI-compatible) و حالت‌های مختلف providers.
     """
-    # اگر آبجکت شبیه dict بود:
-    if isinstance(choice, dict):
-        msg = choice.get("message") or {}
-        # گاهی متن مستقیم در choice["text"] است
-        if "text" in choice and isinstance(choice["text"], str):
-            return choice["text"]
-        # پیام
-        if isinstance(msg, dict):
-            content = msg.get("content")
-            if isinstance(content, str):
-                return content
-            if isinstance(content, list):
-                parts: List[str] = []
-                for p in content:
-                    if isinstance(p, dict):
-                        # حالت‌های متداول HF
-                        if isinstance(p.get("text"), str):
-                            parts.append(p["text"])
-                        elif isinstance(p.get("content"), str):
-                            parts.append(p["content"])
-                        elif isinstance(p.get("data"), str):
-                            parts.append(p["data"])
-                    elif isinstance(p, str):
-                        parts.append(p)
-                return "".join(parts)
+    if not isinstance(resp_dict, dict):
         return ""
-    # آبجکت typed (OpenAI SDK)
-    msg = getattr(choice, "message", None)
-    # اگر خود choice متن داشت
-    direct_text = getattr(choice, "text", None)
-    if isinstance(direct_text, str) and direct_text.strip():
-        return direct_text
-    # پیام دارای content
-    if msg is not None:
-        content = getattr(msg, "content", None)
+    choices = resp_dict.get("choices") or []
+    if not choices:
+        return ""
+    ch = choices[0]
+
+    # 1) حالت رایج: ch["message"]["content"]
+    msg = ch.get("message")
+    if isinstance(msg, dict):
+        content = msg.get("content")
         if isinstance(content, str):
             return content
         if isinstance(content, list):
-            pieces: List[str] = []
-            for part in content:
-                # part ممکن است dict یا typed باشد
-                if isinstance(part, dict):
-                    if isinstance(part.get("text"), str):
-                        pieces.append(part["text"])
-                    elif isinstance(part.get("content"), str):
-                        pieces.append(part["content"])
-                    elif isinstance(part.get("data"), str):
-                        pieces.append(part["data"])
-                else:
-                    t = getattr(part, "text", None)
-                    if isinstance(t, str):
-                        pieces.append(t)
-                    else:
-                        c = getattr(part, "content", None)
-                        if isinstance(c, str):
-                            pieces.append(c)
-                        else:
-                            pieces.append(str(part))
-            return "".join(pieces)
+            parts: List[str] = []
+            for p in content:
+                if isinstance(p, dict):
+                    # HF معمولاً {"type":"text","text":"..."}
+                    if isinstance(p.get("text"), str):
+                        parts.append(p["text"])
+                    elif isinstance(p.get("content"), str):
+                        parts.append(p["content"])
+                    elif isinstance(p.get("data"), str):
+                        parts.append(p["data"])
+                elif isinstance(p, str):
+                    parts.append(p)
+            return "".join(parts)
+
+    # 2) برخی providers متن را مستقیم داخل choice["text"] می‌گذارند
+    if isinstance(ch.get("text"), str):
+        return ch["text"]
+
+    # 3) هیچ‌کدام نبود
     return ""
 
 def generate_answer(user_query: str, k: int = 5, temperature: float = 0.3) -> Dict[str, Any]:
@@ -121,9 +92,27 @@ def generate_answer(user_query: str, k: int = 5, temperature: float = 0.3) -> Di
     messages = _build_messages(user_query, ctx_text)
     resp = client.chat.completions.create(model=model, messages=messages, temperature=temperature)
 
-    # 3) robust text extraction
-    choice0 = resp.choices[0]
-    answer = _extract_text_from_choice(choice0).strip()
+    # 3) به دیکشنری ساده تبدیل کن (پوشش SDKهای مختلف)
+    resp_dict: Dict[str, Any]
+    if hasattr(resp, "model_dump"):               # OpenAI SDK v1
+        resp_dict = resp.model_dump()
+    elif hasattr(resp, "to_dict"):                # برخی کلاینت‌ها
+        resp_dict = resp.to_dict()
+    elif hasattr(resp, "dict"):
+        resp_dict = resp.dict()
+    else:
+        # تلاش آخر: json → dict
+        try:
+            if hasattr(resp, "model_dump_json"):
+                resp_dict = json.loads(resp.model_dump_json())
+            else:
+                resp_dict = json.loads(getattr(resp, "json", lambda: "{}")())
+        except Exception:
+            # در بدترین حالت، سعی می‌کنیم __dict__ را بخوانیم
+            resp_dict = getattr(resp, "__dict__", {}) or {}
+
+    # 4) robust extract
+    answer = _extract_text_from_resp_dict(resp_dict).strip()
 
     return {
         "answer": answer,
