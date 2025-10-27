@@ -1,39 +1,18 @@
-# app/router_chat.py
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Optional, Any, Dict
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+from app.generator import generate_answer  # دقت کن: app.generator
 
-from .generator import generate_answer
+chat_router = APIRouter()
 
-router = APIRouter(prefix="/chat", tags=["chat"])
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., description="User question in Persian or English")
-    k: int = Field(5, ge=1, le=10, description="top-k retrieval")
-    temperature: float = Field(0.3, ge=0.0, le=1.0)
-
-class SourceOut(BaseModel):
-    tag: str
-    source: Optional[str] = None
-
-class RetrievedOut(BaseModel):
-    score: float
-    source: Optional[str]
-    preview: str
-
-class ChatResponse(BaseModel):
-    answer: str
-    sources: List[SourceOut] = []
-    retrieved: List[RetrievedOut] = []
-    model: str
-
-@router.post("", response_model=ChatResponse)
-def chat(req: ChatRequest):
+@chat_router.post("/chat")
+async def chat(request: Request):
     try:
-        out = generate_answer(req.message, k=req.k, temperature=req.temperature)
-        return ChatResponse(**out)
-    except FileNotFoundError as e:
-        # ایندکس پیدا نشد
-        raise HTTPException(status_code=400, detail=str(e))
+        data = await request.json()
+        message = data.get("message", "")
+        response_text = generate_answer(message)
+        return JSONResponse(content={"response": response_text})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"chat_error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"chat_error: {e}"}
+        )
