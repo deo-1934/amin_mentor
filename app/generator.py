@@ -1,66 +1,33 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+# app/generator.py
+import os
+import requests
+from app.settings import settings
 
-# بارگذاری مدل و توکن‌ایزر
-model_name = "google/flan-t5-small"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-
-def generate_response(query, retrieved_data):
+def generate(prompt: str) -> str:
     """
-    تولید پاسخ با استفاده از مدل flan-t5-small از Hugging Face.
-
-    Args:
-        query (str): سوال کاربر
-        retrieved_data (list): لیست داده‌های بازیابی‌شده
-
-    Returns:
-        str: پاسخ تولیدشده توسط مدل
+    Send a prompt to Hugging Face Inference API and return the generated text.
     """
-    prompt = f"""
-    شما یک منتور شخصی هستید. بر اساس داده‌های زیر به سوال کاربر پاسخ دهید.
-    اگر داده‌های مرتبط کافی نیستند، پاسخ دهید: "متأسفانه اطلاعات کافی برای پاسخ به این سوال ندارم."
-
-    داده‌های مرتبط:
-    {"\\n".join(retrieved_data)}
-
-    سوال کاربر:
-    {query}
-
-    پاسخ:
-    """
-
-    # توکنایز کردن ورودی
-    inputs = tokenizer(prompt, return_tensors="pt")
-
-    # تولید پاسخ
-    outputs = model.generate(**inputs, max_length=200)
-
-    # دیکد کردن پاسخ
-    answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    return answer
-
-def generate_answer(message, k=5, temperature=0.3):
-    """
-    تابع اصلی برای تولید پاسخ به سوال کاربر.
-
-    Args:
-        message (str): سوال کاربر
-        k (int): تعداد داده‌های بازیابی‌شده
-        temperature (float): پارامتر temperature برای مدل
-
-    Returns:
-        dict: پاسخ و منابع مرتبط
-    """
-    # اینجا باید منطق بازیابی داده‌ها از ایندکس FAISS یا ChromaDB اضافه شود
-    # مثال: retrieved_data = retriever.retrieve(message, k=k)
-    retrieved_data = []  # جایگزین با داده‌های واقعی
-
-    answer = generate_response(message, retrieved_data)
-
-    return {
-        "answer": answer,
-        "sources": [],
-        "retrieved": [],
-        "model": model_name
+    headers = {
+        "Authorization": f"Bearer {settings.model_api_key}",
+        "Content-Type": "application/json"
     }
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 200,
+            "temperature": 0.7,
+            "return_full_text": False
+        }
+    }
+
+    try:
+        response = requests.post(settings.model_endpoint, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]["generated_text"]
+        else:
+            return "⚠️ پاسخ مدل خالی بود یا ساختار نامعتبر داشت."
+    except Exception as e:
+        return f"❌ خطا در ارتباط با مدل: {e}"
