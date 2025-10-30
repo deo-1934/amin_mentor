@@ -9,7 +9,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# ------- ایمپورت لایه‌ها
 from app.retriever import retrieve
 from app.generator import generate_answer
 
@@ -25,18 +24,29 @@ st.markdown(
 
 st.markdown("سؤال خودت رو بنویس 👇")
 
-question = st.text_input(" ", placeholder="مثلاً: چطور می‌تونم اعتماد به‌نفس در مذاکره رو بهتر کنم؟")
+question = st.text_input(
+    " ",
+    placeholder="مثلاً: مهم‌ترین اصل توی یک مذاکره حرفه‌ای چیه؟",
+)
 
 if st.button("💬 پرسیدن از منتور"):
     if not question.strip():
         st.warning("اول یک سؤال بنویس 🙂")
     else:
         try:
-            # مرحله ۱: بازیابی دانش (retrieval)
-            retrieved_docs = retrieve(question)
+            # 1. بازیابی اسناد مرتبط
+            raw_docs = retrieve(question)
 
-            # مرحله ۲: تولید پاسخ
-            answer = generate_answer(question, retrieved_docs)
+            # 2. استخراج فقط متن از نتایج (برای جلوگیری از خطای dict.strip)
+            context_texts = []
+            for item in raw_docs:
+                if isinstance(item, dict) and "text" in item:
+                    context_texts.append(item["text"])
+                elif isinstance(item, str):
+                    context_texts.append(item)
+
+            # 3. تولید پاسخ با متن‌های تمیز
+            answer = generate_answer(question, context_texts)
 
             st.markdown("### 🧠 پاسخ منتور")
             st.write(answer)
