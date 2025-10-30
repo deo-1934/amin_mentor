@@ -1,65 +1,73 @@
 # app/ui.py
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+import sys
+import os
 import streamlit as st
-from app.retriever import retrieve
-from app.generator import generate_answer
 
-# پیکربندی صفحه
+# ------------------------------------------------------------
+# مسیر پروژه را به sys.path اضافه می‌کنیم تا در Cloud ایمپورت‌ها بشناسد
+# ------------------------------------------------------------
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+# ------------------------------------------------------------
+# ایمپورت‌های حساس با لاگ برای دیباگ Cloud
+# ------------------------------------------------------------
+try:
+    from app.retriever import retrieve
+except Exception as e:
+    st.error(f"❌ retriever import error: {e}")
+
+try:
+    from app.generator import generate_answer
+except Exception as e:
+    st.error(f"❌ generator import error: {e}")
+
+# ------------------------------------------------------------
+# تنظیمات صفحه
+# ------------------------------------------------------------
 st.set_page_config(page_title="Amin Mentor", page_icon="💬")
 
-# هدر
-st.title("Amin Mentor")
-st.caption("سؤال‌تان را بپرسید؛ من از دانش داخلی امین پاسخ می‌سازم.")
+st.title("🎓 Amin Mentor")
 
-# فرم
-with st.form("chat"):
-    q = st.text_input(
-        "سؤال شما:",
-        value="مثلاً: اصول مذاکره برد-برد چیست؟",
-        placeholder="هر چیزی که می‌خوای بدونی رو بپرس..."
-    )
-    show_sources = st.checkbox("نمایش منابع بازیابی‌شده", value=False)
-    submitted = st.form_submit_button("ارسال")
+st.markdown("""
+به **منتور شخصی امین** خوش اومدی!  
+اینجا می‌تونی پرسش‌هات درباره‌ی کسب‌وکار، یادگیری، و توسعه فردی رو بپرسی 💬  
+و از هوش مصنوعی منتور، پاسخ تخصصی و شخصی‌سازی‌شده بگیری.
+""")
 
-# تنظیمات داخلی
-TOP_K_DEFAULT = 5
-MAX_NEW_TOKENS_DEFAULT = 200
+# ------------------------------------------------------------
+# ورودی کاربر
+# ------------------------------------------------------------
+query = st.text_input("سؤال خودت رو بنویس 👇")
 
-if submitted and q.strip():
-    with st.spinner("در حال آماده‌سازی پاسخ..."):
-        # ۱) بازیابی
-        hits = retrieve(q, top_k=TOP_K_DEFAULT)
-        context = [h.get("text", "") for h in hits if h.get("text")]
+if st.button("پرسیدن از منتور 🧠") and query:
+    with st.spinner("در حال پردازش پاسخ منتور..."):
+        try:
+            # داده‌های بازیابی شده از حافظه یا پایگاه دانش
+            retrieved_docs = retrieve(query)
+            st.markdown("### 📚 منابع پیدا شده:")
+            for i, doc in enumerate(retrieved_docs, start=1):
+                st.markdown(f"**منبع {i}:** {doc}")
 
-        # ۲) تولید پاسخ
-        answer = generate_answer(
-            q,
-            context=context,
-            max_new_tokens=MAX_NEW_TOKENS_DEFAULT
-        )
+            # پاسخ نهایی منتور
+            answer = generate_answer(query, retrieved_docs)
+            st.markdown("### 💬 پاسخ منتور:")
+            st.write(answer)
 
-    # فقط پاسخ
-    st.subheader("🧠 پاسخ منتور")
-    st.write(answer)
+        except Exception as e:
+            st.error(f"🚨 خطایی رخ داد: {e}")
+else:
+    st.info("👆 یه سؤال بنویس و روی دکمه‌ی بالا بزن تا پاسخ منتور رو ببینی.")
 
-    # نمایش منابع در صورت درخواست
-    if show_sources:
-        st.markdown("---")
-        st.subheader("📚 منابع")
-        if not hits:
-            st.info("منبعی یافت نشد.")
-        else:
-            for i, h in enumerate(hits, start=1):
-                st.markdown(f"**منبع {i}**")
-                st.write(h.get("text", ""))
-                src = h.get("source") or {}
-                meta_bits = []
-                if "file" in src:
-                    meta_bits.append(f"فایل: {src['file']}")
-                if "chunk_idx" in src:
-                    meta_bits.append(f"بخش: {src['chunk_idx']}")
-                if meta_bits:
-                    st.caption(" / ".join(meta_bits))
-                st.divider()
+# ------------------------------------------------------------
+# اطلاعات فنی برای توسعه‌دهنده (اختیاری)
+# ------------------------------------------------------------
+with st.expander("⚙️ جزئیات فنی (برای توسعه‌دهنده‌ها)"):
+    st.json({
+        "cwd": os.getcwd(),
+        "sys.path": sys.path[:3],
+        "file": __file__,
+        "project_root": PROJECT_ROOT,
+    })
