@@ -1,6 +1,10 @@
+# Amin Mentor - Streamlit Cloud Requirements
+# lightweight deps only for public demo
+
 streamlit==1.39.0
 sentence-transformers==2.7.0
 faiss-cpu==1.8.0.post1
 numpy==1.26.4
 requests==2.32.3
 torch==2.3.0
+python-dotenv==1.0.1
