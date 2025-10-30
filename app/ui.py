@@ -1,57 +1,87 @@
 # app/ui.py
-import sys
-import os
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import streamlit as st
-
-# ------- مسیر پروژه برای ایمپورت ماژول‌های داخلی (Cloud-safe)
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
 from app.retriever import retrieve
-from app.generator import generate_answer
+from app.generator import generate_hybrid_answer, healthcheck
 
-# ------- UI config
-st.set_page_config(page_title="Amin Mentor", page_icon="🎓")
-st.title("🎓 Amin Mentor")
+
+st.set_page_config(
+    page_title="Amin Mentor",
+    page_icon="🎓",
+)
 
 st.markdown(
-    "به منتور شخصی امین خوش اومدی! "
-    "اینجا می‌تونی پرسش‌هات درباره‌ی کسب‌وکار، یادگیری، و توسعه فردی رو بپرسی 💬 "
-    "و از هوش مصنوعی منتور، پاسخ تخصصی و شخصی‌سازی‌شده بگیری."
+    """
+    <style>
+    .main-title {
+        font-size: 2rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .subtext {
+        color: #aaa;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-st.markdown("سؤال خودت رو بنویس 👇")
-
-question = st.text_input(
-    " ",
-    placeholder="مثلاً: مهم‌ترین اصل توی یک مذاکره حرفه‌ای چیه؟",
+st.markdown(
+    f"""
+    <div class="main-title">🎓 Amin Mentor</div>
+    <div class="subtext">
+    اینجا منتور شخصی امینه. ازت حمایت می‌کنه، بهت راه‌حل قابل‌اجرا می‌ده،
+    و سعی می‌کنه با لحن انسانی جواب بده. 👇
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
-if st.button("💬 پرسیدن از منتور"):
-    if not question.strip():
-        st.warning("اول یک سؤال بنویس 🙂")
-    else:
-        try:
-            # 1. بازیابی اسناد مرتبط
-            raw_docs = retrieve(question)
+user_q = st.text_input("سوالت رو بنویس 👇", placeholder="مثلاً: چطور تو مذاکره استرس نداشته باشم؟")
 
-            # 2. استخراج فقط متن از نتایج (برای جلوگیری از خطای dict.strip)
-            context_texts = []
-            for item in raw_docs:
-                if isinstance(item, dict) and "text" in item:
-                    context_texts.append(item["text"])
-                elif isinstance(item, str):
-                    context_texts.append(item)
+col1, col2 = st.columns([1,1])
+with col1:
+    ask_btn = st.button("پرسیدن از منتور 🧠", use_container_width=True)
+with col2:
+    debug_toggle = st.toggle("نمایش جزییات فنی (برای توسعه‌دهنده)", value=False)
 
-            # 3. تولید پاسخ با متن‌های تمیز
-            answer = generate_answer(question, context_texts)
+if ask_btn and user_q.strip():
+    with st.spinner("در حال فکر کردن... ⏳"):
+        # مرحله ۱: بازیابی دانش داخلی (RAG)
+        hits = retrieve(user_q, top_k=5)
 
-            st.markdown("### 🧠 پاسخ منتور")
-            st.write(answer)
+        # مرحله ۲: ترکیب با مدل زبانی برای پاسخ انسانی
+        final_answer = generate_hybrid_answer(
+            user_question=user_q,
+            retrieved_docs=hits,
+            max_new_tokens=200,
+        )
 
-        except Exception as e:
-            st.error(f"🚨 خطایی رخ داد: {e}")
-else:
-    st.caption("یک سؤال بنویس و روی دکمه بزن تا پاسخ منتور رو ببینی.")
+    # نمایش فقط جواب نهایی برای کاربر
+    st.subheader("پاسخ منتور 💬")
+    st.write(final_answer)
+
+    # اگر تیک debug خورده بود، اطلاعات فنی رو هم نشون بده
+    if debug_toggle:
+        st.markdown("---")
+        st.write("### 📚 منابعی که پیدا شد")
+        if hits:
+            for i, h in enumerate(hits, start=1):
+                st.markdown(f"**منبع {i}:** {h.get('text','')}")
+                st.caption(f"📎 {h.get('source','?')} | distance={h.get('distance','?')}")
+        else:
+            st.write("هیچ منبع مستقیمی پیدا نشد.")
+
+        st.markdown("---")
+        st.write("### 🔧 وضعیت مدل (healthcheck):")
+        st.json(healthcheck())
+
+elif ask_btn and not user_q.strip():
+    st.error("یه سوال بنویس بعد بزن روی دکمه 😅")
