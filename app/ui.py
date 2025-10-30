@@ -1,3 +1,4 @@
+# app/ui.py
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -6,44 +7,54 @@ from app.retriever import retrieve
 from app.generator import generate_answer
 
 # پیکربندی صفحه
-st.set_page_config(
-    page_title="Amin Mentor",
-    page_icon="💬",
-)
+st.set_page_config(page_title="Amin Mentor", page_icon="💬")
 
-# هدر بالا
+# هدر
 st.title("Amin Mentor")
-st.caption("یه سؤال بپرس؛ من از دانش داخلی امین جواب می‌سازم.")
+st.caption("سؤال‌تان را بپرسید؛ من از دانش داخلی امین پاسخ می‌سازم.")
 
-# --- فرم چت با یک ورودی و یک دکمه ---
+# فرم
 with st.form("chat"):
     q = st.text_input(
         "سؤال شما:",
         value="مثلاً: اصول مذاکره برد-برد چیست؟",
         placeholder="هر چیزی که می‌خوای بدونی رو بپرس..."
     )
-
+    show_sources = st.checkbox("نمایش منابع بازیابی‌شده", value=False)
     submitted = st.form_submit_button("ارسال")
 
-# مقادیر داخلی که دیگه به کاربر نشون نمی‌دیم
+# تنظیمات داخلی
 TOP_K_DEFAULT = 5
 MAX_NEW_TOKENS_DEFAULT = 200
 
 if submitted and q.strip():
-    # ۱. مرحله بازیابی
-    with st.spinner("در حال جستجوی منابع داخلی..."):
+    with st.spinner("در حال آماده‌سازی پاسخ..."):
+        # ۱) بازیابی
         hits = retrieve(q, top_k=TOP_K_DEFAULT)
+        context = [h.get("text", "") for h in hits if h.get("text")]
 
-    # نمایش منابع بازیابی‌شده
-    if hits:
-        st.subheader("📚 منابع پیدا شده")
-        for i, h in enumerate(hits, 1):
-            st.markdown(f"**منبع {i}**")
-            st.write(h.get("text", ""))
+        # ۲) تولید پاسخ
+        answer = generate_answer(
+            q,
+            context=context,
+            max_new_tokens=MAX_NEW_TOKENS_DEFAULT
+        )
 
-            # نمایش اطلاعات منبع (اختیاری)
-            src = h.get("source") or {}
-            if src:
+    # فقط پاسخ
+    st.subheader("🧠 پاسخ منتور")
+    st.write(answer)
+
+    # نمایش منابع در صورت درخواست
+    if show_sources:
+        st.markdown("---")
+        st.subheader("📚 منابع")
+        if not hits:
+            st.info("منبعی یافت نشد.")
+        else:
+            for i, h in enumerate(hits, start=1):
+                st.markdown(f"**منبع {i}**")
+                st.write(h.get("text", ""))
+                src = h.get("source") or {}
                 meta_bits = []
                 if "file" in src:
                     meta_bits.append(f"فایل: {src['file']}")
@@ -51,29 +62,4 @@ if submitted and q.strip():
                     meta_bits.append(f"بخش: {src['chunk_idx']}")
                 if meta_bits:
                     st.caption(" / ".join(meta_bits))
-
-            st.divider()
-    else:
-        st.info("هیچ بخشی از دانش داخلی پیدا نشد.")
-
-    # ۲. مرحله تولید پاسخ
-    ctx = [h["text"] for h in hits if h.get("text")]
-    with st.spinner("در حال تولید پاسخ..."):
-        ans = generate_answer(
-            q,
-            context=ctx,
-            max_new_tokens=MAX_NEW_TOKENS_DEFAULT
-        )
-
-    st.subheader("🧠 پاسخ منتور")
-    st.write(ans)
-
-    # ۳. باکس فنی فقط برای تو (می‌تونی کامل حذفش کنی اگه نخوای)
-    st.markdown("---")
-    with st.expander("جزئیات فنی (برای توسعه‌دهنده)"):
-        st.json({
-            "query": q,
-            "top_k_used": TOP_K_DEFAULT,
-            "context_snippets_used": len(ctx),
-            "raw_context_preview": ctx[:2],  # فقط ۲ تا، برای امنیت
-        })
+                st.divider()
