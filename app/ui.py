@@ -1,7 +1,6 @@
 #FEYZ
 #DEO
 # -*- coding: utf-8 -*-
-import os
 import json
 import time
 from typing import Dict, Any, List
@@ -14,95 +13,74 @@ try:
 except Exception:
     from generator import generate_answer, load_settings
 
-# ------------------------- Page Config -------------------------
-st.set_page_config(
-    page_title="Amin Mentor — Chat",
-    page_icon="🤝",
-    layout="wide"
-)
+st.set_page_config(page_title="Amin Mentor — Chat", page_icon="🤝", layout="wide")
 
-# ------------------------- Sidebar (تنظیمات) -------------------------
+# هدر مینیمال
+st.markdown("## منتور شخصی امین")
+st.caption("چت تمیز و سریع؛ پاسخ‌ها به شکل **مقدمه / هسته / جمع‌بندی** نمایش داده می‌شوند.")
+
+# تنظیمات از Secrets/ENV (بدون نمایش)
 settings = load_settings()
-
-with st.sidebar:
-    st.markdown("### ⚙️ تنظیمات")
-    provider_options = ["openai", "huggingface", "offline"]
-    try:
-        default_idx = provider_options.index(settings.get("MODEL_PROVIDER", "openai"))
-    except ValueError:
-        default_idx = 0
-    model_provider = st.selectbox("Model Provider", provider_options, index=default_idx)
-
-    # OpenAI
-    openai_model = st.text_input(
-        "OPENAI_MODEL",
-        value=settings.get("OPENAI_MODEL", "gpt-4o-mini"),
-        placeholder="gpt-4o-mini / gpt-4.1-mini / …",
-        help="وقتی Provider = openai است"
-    )
-    openai_api_key = st.text_input(
-        "OPENAI_API_KEY",
-        value=settings.get("OPENAI_API_KEY", ""),
-        type="password"
-    )
-
-    # HuggingFace
-    model_endpoint = st.text_input(
-        "HF MODEL_ENDPOINT",
-        value=settings.get("MODEL_ENDPOINT", ""),
-        placeholder="https://api-inference.huggingface.co/models/gpt2",
-        help="وقتی Provider = huggingface است"
-    )
-    hf_token = st.text_input(
-        "HF_TOKEN",
-        value=settings.get("HF_TOKEN", ""),
-        type="password"
-    )
-
-    temperature = st.slider("Temperature", 0.0, 1.5, value=0.2, step=0.05)
-    max_new_tokens = st.slider("Max new tokens", 16, 1024, value=256, step=16)
-    top_k = st.slider("Top-K Retrieval", 1, 10, value=5, step=1)
-
-    st.divider()
-    if st.button("🧹 پاک‌سازی تاریخچه", use_container_width=True):
-        st.session_state.messages = []
-        st.experimental_rerun()
+provider_default = settings.get("MODEL_PROVIDER", "openai")
+openai_model_default = settings.get("OPENAI_MODEL", "gpt-4o-mini")
+openai_key_default = settings.get("OPENAI_API_KEY", "")
+hf_endpoint_default = settings.get("MODEL_ENDPOINT", "")
+hf_token_default = settings.get("HF_TOKEN", "")
 
 #DEO
-# ------------------------- Header -------------------------
-st.markdown("## منتور شخصی امین")
-st.caption("چتِ تمیز و سریع؛ پاسخ‌ها به شکل **مقدمه / هسته / جمع‌بندی** نمایش داده می‌شوند.")
+# حالت ادمین اختیاری (فقط اگر ?admin=1 به URL اضافه شود)
+is_admin = False
+try:
+    # Streamlit v1.31+: st.query_params به صورت dict-like
+    qp = st.query_params  # type: ignore[attr-defined]
+    is_admin = str(qp.get("admin", "0")) in ("1", "true", "True")
+except Exception:
+    pass
 
-# ------------------------- Session State -------------------------
+if is_admin:
+    with st.expander("⚙️ Admin (پنهان از کاربر نهایی)", expanded=False):
+        st.code(json.dumps({
+            "provider": provider_default,
+            "has_openai_key": bool(openai_key_default),
+            "has_hf_token": bool(hf_token_default),
+            "cache_path": settings.get("CACHE_PATH"),
+        }, ensure_ascii=False, indent=2))
+
+# پارامترهای ثابت UI (نمایش نمی‌دهیم؛ فقط استفاده می‌کنیم)
+TEMPERATURE_DEFAULT = 0.2
+MAX_NEW_TOKENS_DEFAULT = 256
+TOP_K_DEFAULT = 5
+
+# نگهداری تاریخچهٔ چت
 if "messages" not in st.session_state:
     st.session_state.messages: List[Dict[str, str]] = []
 
-# رندر تاریخچهٔ پیام‌ها
+# نمایش تاریخچه
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ------------------------- Chat Input -------------------------
+# ورودی چت
 prompt = st.chat_input("پیام خود را بنویسید…")
 if prompt:
-    # 1) نمایش پیام کاربر
+    # پیام کاربر
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 2) فراخوانی ژنراتور
+    # فراخوانی ژنراتور با مقادیر از Secrets/ENV
     cfg: Dict[str, Any] = dict(
-        model_provider=model_provider,
+        model_provider=provider_default,
         # OpenAI
-        openai_model=openai_model,
-        openai_api_key=openai_api_key,
+        openai_model=openai_model_default,
+        openai_api_key=openai_key_default,
         # HF
-        model_endpoint=model_endpoint,
-        hf_token=hf_token,
-        # common
-        temperature=temperature,
-        max_new_tokens=max_new_tokens,
-        top_k=top_k,
+        model_endpoint=hf_endpoint_default,
+        hf_token=hf_token_default,
+        # Common
+        temperature=TEMPERATURE_DEFAULT,
+        max_new_tokens=MAX_NEW_TOKENS_DEFAULT,
+        top_k=TOP_K_DEFAULT,
     )
 
     with st.chat_message("assistant"):
@@ -117,7 +95,6 @@ if prompt:
 
         dt = time.time() - t0
 
-        # مونتاژ پاسخ سه‌بخشی به یک پیام واحد
         intro = (result.get("intro") or "").strip()
         core = (result.get("core") or "").strip()
         outro = (result.get("outro") or "").strip()
@@ -134,5 +111,5 @@ if prompt:
         placeholder.markdown(final_md)
         st.caption(f"⏱️ زمان تولید: {dt:.2f}s")
 
-    # 3) ذخیرهٔ پیام دستیار در تاریخچه
+    # ذخیره پاسخ
     st.session_state.messages.append({"role": "assistant", "content": final_md})
