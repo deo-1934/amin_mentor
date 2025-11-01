@@ -1,6 +1,18 @@
 #FEYZ
 #DEO
+import os
+import sys
 import streamlit as st
+
+# -------------------------
+# افزودن مسیر پکیج به sys.path
+# -------------------------
+# مسیر فولدر بالاتر از پوشه app (یعنی amin_mentor)
+PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PARENT_DIR not in sys.path:
+    sys.path.append(PARENT_DIR)
+
+# حالا می‌تونیم با خیال راحت generator رو import کنیم
 from app.generator import generate_answer
 
 # -------------------------
@@ -9,13 +21,12 @@ from app.generator import generate_answer
 st.set_page_config(page_title="منتور شخصی امین", page_icon="🧠", layout="centered")
 
 st.title("🧠 منتور شخصی امین")
-st.caption("یک دوست در کنارت 💬")
+st.caption("یک دوست عاقل، صبور و همیشه در کنارت 💬")
 
 # -------------------------
 # حافظه مکالمه در session_state
 # -------------------------
 if "chat_history" not in st.session_state:
-    # هر آیتم در این لیست شامل نقش و محتواست
     st.session_state.chat_history = []
 
 # -------------------------
@@ -43,24 +54,24 @@ for msg in st.session_state.chat_history:
 user_input = st.chat_input("سؤالت رو بنویس یا حرف دلت رو بزن...")
 
 if user_input:
-    # ۱. پیام کاربر رو ذخیره کن و نشون بده
+    # پیام کاربر
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     st.markdown(f"🧍‍♀️ **تو:** {user_input}")
     st.divider()
 
-    # ۲. ساخت context از کل گفتگو (کاربر + منتور)
+    # کل گفت‌وگو (user + assistant) برای context
     context_chunks = [
         f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history
     ]
 
-    # ۳. تماس با مدل
+    # پاسخ مدل
     with st.spinner("منتور داره فکر می‌کنه… 🤔"):
         try:
             answer = generate_answer(user_input, context_chunks)
         except Exception as e:
             answer = f"⚠️ خطا در پاسخ‌گویی: {e}"
 
-    # ۴. نمایش و ذخیرهٔ پاسخ منتور
+    # ذخیره پاسخ و نمایش
     st.session_state.chat_history.append({"role": "assistant", "content": answer})
     st.markdown(f"🤖 **منتور:** {answer}")
     st.divider()
