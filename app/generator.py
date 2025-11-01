@@ -3,10 +3,13 @@
 # -*- coding: utf-8 -*-
 """
 generator.py
-- خروجی: یک متن یک‌تکه (string)
-- اتصال به OpenAI وقتی MODEL_PROVIDER="openai"
-- اتصال به HuggingFace وقتی MODEL_PROVIDER="huggingface"
-- کش برای کاهش هزینه
+لایه‌ی هوشمند برای کم‌کردن هزینه:
+1) Rule-based → اگر سوال ساده/تکراری بود همین‌جا جواب می‌ده (بدون هزینه)
+2) Retrieval داخلی → اگر تو دیتای خودمون جواب هست، از همون می‌ده (بدون هزینه)
+3) OpenAI/HF → فقط وقتی لازم شد می‌ره سراغ مدل ابری
+4) fallback → اگر هیچی کار نکرد، یه جواب امن می‌ده
+
+خروجی همیشه فقط یک متن یک‌تکه است (نه مقدمه/بدنه/جمع‌بندی).
 """
 
 import os, json
@@ -14,14 +17,18 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import requests
 
+# تلاش برای ایمپورت OpenAI SDK جدید
 try:
-    from openai import OpenAI  # SDK جدید OpenAI
+    from openai import OpenAI  # type: ignore
 except Exception:
     OpenAI = None
 
 
 def _read_secret_or_env(key: str, default: str = "") -> str:
-    # اول از st.secrets بخون (Streamlit Cloud)، بعد از env لوکال
+    """
+    اول از st.secrets (روی Streamlit Cloud)
+    بعد از os.environ (روی لوکال .env)
+    """
     try:
         import streamlit as st  # type: ignore
         if key in getattr(st, "secrets", {}):
@@ -32,6 +39,9 @@ def _read_secret_or_env(key: str, default: str = "") -> str:
 
 
 def load_settings() -> Dict[str, Any]:
+    """
+    مقادیر تنظیمات مدل و مسیر کش رو برمی‌گردونه
+    """
     base_dir = Path(__file__).resolve().parents[1]
     data_dir = base_dir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -41,7 +51,10 @@ def load_settings() -> Dict[str, Any]:
         "MODEL_PROVIDER": _read_secret_or_env("MODEL_PROVIDER", "openai").strip().lower(),
         "OPENAI_API_KEY": _read_secret_or_env("OPENAI_API_KEY", ""),
         "OPENAI_MODEL": _read_secret_or_env("OPENAI_MODEL", "gpt-4o-mini"),
-        "MODEL_ENDPOINT": _read_secret_or_env("MODEL_ENDPOINT", "https://api-inference.huggingface.co/models/gpt2"),
+        "MODEL_ENDPOINT": _read_secret_or_env(
+            "MODEL_ENDPOINT",
+            "https://api-inference.huggingface.co/models/gpt2"
+        ),
         "HF_TOKEN": _read_secret_or_env("HF_TOKEN", ""),
         "CACHE_PATH": str(cache_path),
         "DEFAULT_MAX_NEW_TOKENS": int(_read_secret_or_env("MAX_NEW_TOKENS", "256")),
@@ -61,12 +74,19 @@ def _load_cache(path: str) -> Dict[str, Any]:
 
 def _save_cache(path: str, data: Dict[str, Any]) -> None:
     try:
-        Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        Path(path).write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
     except Exception:
         pass
 
 
 def _join_context(context: Optional[List[str]]) -> str:
+    """
+    context یعنی تیکه‌های برگردونده از retriever.retrieve()
+    ما این تیکه‌ها رو به مدل خارجی می‌دیم تا بهتر بفهمه، ولی مستقیم به کاربر نشونش نمی‌دیم.
+    """
     if not context:
         return ""
     cleaned = [c.strip() for c in context if c and c.strip()]
@@ -74,36 +94,42 @@ def _join_context(context: Optional[List[str]]) -> str:
         return ""
     ctx = "\n\n".join(cleaned)
     return (
-        "\n\n[دانش داخلی مرتبط برای کمک به کیفیت پاسخ. این بخش برای مدل است و مستقیم به کاربر نشان داده نمی‌شود:]\n"
+        "\n\n[یادداشت کمکی برای مدل (دانش داخلی ما):]\n"
         f"{ctx}\n"
     )
 
 
+# یک بانک جواب‌های آماده و ارزان برای سوال‌های پرتکرار / ساده
 _RULES = {
     "streamlit": (
-        "برای استقرار پایدار روی Streamlit Cloud از runtime.txt با نسخهٔ پایتون ثابت استفاده کن، "
-        "Secrets را جایگزین .env کن و با اضافه کردن __init__.py در پوشهٔ app از خطای ModuleNotFoundError جلوگیری کن."
+        "برای استقرار در Streamlit Cloud: نسخهٔ پایتون رو در runtime.txt قفل کن (مثلاً 3.11)، "
+        "Secrets رو جایگزین .env کن، و یک فایل __init__.py داخل پوشه app بذار تا import خراب نشه."
     ),
     "faiss": (
-        "برای جست‌وجوی دانش لوکال سریع، متن‌ را تمیز و تکه‌بندی کن، با all-MiniLM-L6-v2 امبدینگ بگیر "
-        "و نتایج را در FAISS ایندکس کن تا top_k سریع بازیابی شود."
+        "برای جست‌وجوی محلی سریع باید متن رو تمیز و تکه‌بندی کنی، با all-MiniLM-L6-v2 امبدینگ بگیری "
+        "و بعدش این امبدینگ‌ها رو داخل FAISS ذخیره کنی تا top_k خیلی سریع بیاد."
     ),
     "api": (
-        "برای کاهش هزینهٔ API، سؤالات تکراری را کش کن و فقط وقتی واقعاً لازم شد سراغ مدل ابری برو. "
-        "هر سؤال جدید را اول به یک قدم کوچک و قابل‌اجرا تبدیل کن."
+        "برای کم‌کردن هزینهٔ API، سوالات تکراری رو کش کن و فقط برای سوال‌های واقعاً جدید یا پیچیده برو سراغ مدل ابری. "
+        "قبل از خرج‌کردن، مسئله رو به یک قدم کوچک و قابل‌اجرا در امروز تبدیل کن."
     ),
     "کسب و کار": (
-        "اول مشکل واقعی مشتری را دقیق بفهم. بدون درک نیاز واقعی، رشد فقط توهمه. "
-        "ارزش ملموس بده، بعد مقیاس‌پذیری را حل کن."
+        "هستهٔ هر کسب‌وکار سالم اینه که یک درد واقعی مشتری رو حل کنه با یه ارزشی که قابل لمس باشه. "
+        "تا وقتی به تکرارپذیری نرسیدی، دنبال بزرگ‌شدن نباش."
     ),
     "مذاکره": (
-        "در مذاکره گوش دادن از حرف زدن مهم‌تر است. اول بفهم طرف مقابل دقیقاً چه دردی دارد و چرا. "
-        "هدف قانع کردن زورکی نیست؛ هدف رسیدن به نقطهٔ برد-برد است."
+        "در مذاکره اول گوش بده و بفهم طرف مقابل چی می‌خواد و چرا. "
+        "بجای جنگیدن برای قانع کردن، دنبال نقطهٔ برد-برد باش."
     ),
 }
 
 
 def _rule_based_answer(query: str) -> Optional[str]:
+    """
+    اگر سوال کاربر شامل یک کلیدواژه از RULES باشه،
+    بدون هیچ هزینه‌ای همون لحظه جواب می‌دیم.
+    این یعنی مرحله‌ی ۱ (ارزون‌ترین حالت).
+    """
     q_low = (query or "").lower()
     for key, val in _RULES.items():
         if key.lower() in q_low:
@@ -111,12 +137,17 @@ def _rule_based_answer(query: str) -> Optional[str]:
     return None
 
 
-def _hf_generate(prompt: str,
-                 endpoint: str,
-                 token: str,
-                 temperature: float,
-                 max_new_tokens: int,
-                 timeout: float = 40.0) -> str:
+def _hf_generate(
+    prompt: str,
+    endpoint: str,
+    token: str,
+    temperature: float,
+    max_new_tokens: int,
+    timeout: float = 40.0
+) -> str:
+    """
+    تماس با HuggingFace Inference API (مرحله مدل ابری اقتصادی‌تر).
+    """
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     payload = {
         "inputs": prompt,
@@ -130,6 +161,7 @@ def _hf_generate(prompt: str,
     r.raise_for_status()
     data = r.json()
 
+    # ساختار متداول خروجی HF
     if isinstance(data, list) and data and isinstance(data[0], dict) and "generated_text" in data[0]:
         return str(data[0]["generated_text"]).strip()
     if isinstance(data, dict) and "generated_text" in data:
@@ -139,17 +171,22 @@ def _hf_generate(prompt: str,
 
 
 #DEO
-def _openai_generate(prompt: str,
-                     api_key: str,
-                     model_name: str,
-                     temperature: float,
-                     max_new_tokens: int) -> str:
+def _openai_generate(
+    prompt: str,
+    api_key: str,
+    model_name: str,
+    temperature: float,
+    max_new_tokens: int
+) -> str:
+    """
+    تماس با OpenAI (گرون‌ترین مرحله).
+    از SDK جدید OpenAI استفاده می‌کنیم که با client.responses.create کار می‌کنه.
+    """
     if not OpenAI:
-        raise RuntimeError("openai package not available")
+        raise RuntimeError("openai package not available in this environment")
 
     client = OpenAI(api_key=api_key)
 
-    # در SDK جدید، مدل‌های سری gpt-4o با responses.create صدا زده می‌شن.
     response = client.responses.create(
         model=model_name,
         input=prompt,
@@ -157,14 +194,14 @@ def _openai_generate(prompt: str,
         max_output_tokens=int(max_new_tokens),
     )
 
+    # چند حالت مختلف خروجی رو پوشش می‌دیم تا متن رو دربیاریم
     text_out = None
 
-    # حالت جدید: response.output (لیست آیتم‌ها با segmentهای متنی)
     try:
         if hasattr(response, "output") and response.output:
             parts = []
             for item in response.output:
-                # item ممکنه .content (لیست) یا .text داشته باشه
+                # item ممکنه .content (لیست segmentها) یا .text داشته باشه
                 if hasattr(item, "content") and item.content:
                     segs = []
                     for seg in item.content:
@@ -179,7 +216,6 @@ def _openai_generate(prompt: str,
     except Exception:
         pass
 
-    # حالت قدیمی‌تر / fallback
     if (not text_out) and hasattr(response, "output_text"):
         try:
             text_out = str(response.output_text).strip()
@@ -202,6 +238,9 @@ def _openai_generate(prompt: str,
 
 
 def healthcheck() -> Dict[str, Any]:
+    """
+    فقط برای دیباگ محلی / لوکال. در UI نهایی ما دیگه نشونش نمی‌دیم.
+    """
     s = load_settings()
     return {
         "provider": s["MODEL_PROVIDER"],
@@ -225,7 +264,13 @@ def generate_answer(
     context: Optional[List[str]] = None,
 ) -> str:
     """
-    فقط یک متن نهایی و یکپارچه برمی‌گرداند.
+    این همون تابعی‌ه که ui.py صداش می‌زنه.
+    استراتژی:
+    - مرحله 1: Rule-based (هیچ تماس گرونی نداره)
+    - مرحله 2: جواب بر اساس context بازیابی‌شده (بازم بدون تماس گرون)
+    - مرحله 3: مدل ابری (OpenAI یا HuggingFace)
+    - مرحله 4: fallback امن
+    خروجی همیشه یک متن یک‌تکه است.
     """
 
     s = load_settings()
@@ -242,60 +287,96 @@ def generate_answer(
     cache_path = s["CACHE_PATH"]
     cache = _load_cache(cache_path)
 
-    ctx_block = _join_context(context)
-    prompt = (
-        "شما یک منتور فارسی هستی. پاسخ باید شفاف، محترمانه و عملی باشد. "
-        "پاسخ را فقط در قالب یک متن یک‌تکه بده. هیچ بخش‌بندی رسمی (مقدمه، جمع‌بندی و...) نده.\n\n"
-        f"سؤال کاربر:\n{query.strip()}\n"
-        f"{ctx_block}"
-    )
+    # context از ریتریور میاد. این یعنی قطعه‌های دانش داخلی ما.
+    ctx_list = context or []
+    ctx_joined = "\n\n".join(ctx_list)
 
-    cache_key = f"{provider}:{hash((query, ctx_block, max_new_tokens, temperature))}"
+    # کش: اگر قبلاً همین سؤال با همین context پرسیده شده، مستقیم بده
+    cache_key = f"{provider}:{hash((query, ctx_joined, max_new_tokens, temperature))}"
     if cache_key in cache:
         return str(cache[cache_key])
 
+    # --- مرحله ۱: Rule-based (ارزون‌ترین) ---
     rb = _rule_based_answer(query)
     if rb:
-        cache[cache_key] = rb
+        final_text = rb
+        cache[cache_key] = final_text
         _save_cache(cache_path, cache)
-        return rb
+        return final_text
 
+    # --- مرحله ۲: جواب از context داخلی بدون مدل ابری ---
+    # اگه retriever تونسته پاراگراف مرتبط پیدا کنه، از همون جواب بساز
+    if ctx_list:
+        best_snippet = ctx_list[0]
+        if len(best_snippet.strip()) > 40:
+            local_answer = (
+                f"بر اساس محتوای داخلی ما:\n\n{best_snippet}\n\n"
+                "اگر لازم داری این رو به یک برنامه عملی و مرحله‌به‌مرحله تبدیل کنیم بگو."
+            )
+            final_text = local_answer
+            cache[cache_key] = final_text
+            _save_cache(cache_path, cache)
+            return final_text
+
+    # --- مرحله ۳: مدل ابری (فقط اگر هنوز جواب ندادیم) ---
+    # اینجاست که هزینه می‌دی. اگر کلید هست و provider مناسب هست، می‌ریم سراغش.
+
+    # ۳.a: OpenAI (گرون ولی باکیفیت)
     if provider == "openai" and api_key:
         try:
-            text = _openai_generate(
+            prompt = (
+                "شما یک منتور و مشاور فارسی هستی. پاسخت باید روان، محترمانه و عملی باشد. "
+                "پاسخ را در یک متن یک‌تکه بده، بدون تیتر یا بخش‌بندی رسمی.\n\n"
+                f"سؤال کاربر:\n{query.strip()}\n\n"
+                "اگر لازم شد از این دانش داخلی کمک بگیر:\n"
+                f"{ctx_joined}\n"
+            )
+
+            final_text = _openai_generate(
                 prompt=prompt,
                 api_key=api_key,
                 model_name=model_name,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
             )
-            cache[cache_key] = text
+
+            cache[cache_key] = final_text
             _save_cache(cache_path, cache)
-            return text
+            return final_text
         except Exception:
+            # اگر تماس OpenAI خطا داد، ادامه می‌دیم به HuggingFace یا fallback
             pass
 
+    # ۳.b: HuggingFace (در صورت تنظیم)
     if provider == "huggingface" and hf_tok:
         try:
-            text = _hf_generate(
+            prompt = (
+                "تو یک دستیار فارسی هستی. پاسخ را شفاف و یک‌تکه بده.\n\n"
+                f"سؤال کاربر:\n{query.strip()}\n\n"
+                "دانش داخلی:\n"
+                f"{ctx_joined}\n"
+            )
+
+            final_text = _hf_generate(
                 prompt=prompt,
                 endpoint=endpoint,
                 token=hf_tok,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
             )
-            cache[cache_key] = text
+
+            cache[cache_key] = final_text
             _save_cache(cache_path, cache)
-            return text
+            return final_text
         except Exception:
             pass
 
-    fallback_text = (
-        "برای رسیدن سریع به نتیجه، مسئله‌ات را به یک گام ۳۰ تا ۶۰ دقیقه‌ای تبدیل کن و فقط همان گام را انجام بده. "
-        "هر تغییری را با این سؤال بسنج: «آیا می‌توانم همین امروز نشانش بدهم؟» "
-        "از تکرار کار جلوگیری کن و فقط وقتی لازم شد سراغ مدل ابری برو تا هزینه پایین بماند."
+    # --- مرحله ۴: fallback نهایی ---
+    final_text = (
+        "مسئله‌ات را تبدیل کن به یک قدم مشخص که در ۳۰ تا ۶۰ دقیقه می‌توانی همین امروز انجامش بدهی. "
+        "هر ایده‌ای را فقط با یک معیار بسنج: آیا خروجی قابل نشان‌دادن تولید می‌کند یا فقط حس شلوغ‌کاری می‌دهد؟ "
+        "اگر بخواهی، می‌توانم همین الان با هم آن یک قدم را تعریف کنیم."
     )
-
-    cache[cache_key] = fallback_text
+    cache[cache_key] = final_text
     _save_cache(cache_path, cache)
-    return fallback_text
+    return final_text
