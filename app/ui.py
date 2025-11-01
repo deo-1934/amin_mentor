@@ -1,80 +1,123 @@
 #FEYZ
 #DEO
-import os
-import sys
 import streamlit as st
+import requests
+import time
 
-# -------------------------
-# افزودن مسیر پکیج به sys.path
-# -------------------------
-# مسیر فولدر بالاتر از پوشه app (یعنی amin_mentor)
-PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PARENT_DIR not in sys.path:
-    sys.path.append(PARENT_DIR)
+# ====== تنظیمات اولیه صفحه ======
+st.set_page_config(
+    page_title="منتور شخصی امین",
+    page_icon="🌿",
+    layout="centered"
+)
 
-# حالا می‌تونیم با خیال راحت generator رو import کنیم
-from app.generator import generate_answer
+# ====== استایل اختصاصی ======
+st.markdown("""
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .main-title {
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+        .prompt-box {
+            border: 1px solid #e1e1e1;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            background-color: #ffffff;
+        }
+        .quick-prompts {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+        .quick-btn {
+            background-color: #e9f5ff;
+            color: #0078d7;
+            border: none;
+            border-radius: 10px;
+            padding: 0.5rem 0.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .quick-btn:hover {
+            background-color: #0078d7;
+            color: white;
+        }
+        .response-box {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f1f3f4;
+            border-radius: 10px;
+            border-left: 5px solid #0078d7;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# -------------------------
-# تنظیمات صفحه
-# -------------------------
-st.set_page_config(page_title="منتور شخصی امین", page_icon="🧠", layout="centered")
+# ====== عنوان و توضیح ======
+st.markdown('<div class="main-title">منتور شخصی امین</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">همراه هوشمند شما در مسیر رشد، یادگیری و تصمیم‌گیری</div>', unsafe_allow_html=True)
 
-st.title("🧠 منتور شخصی امین")
-st.caption("یک دوست در کنارت 💬")
+# ====== پیشنهاد سؤالات آماده ======
+col1, col2, col3 = st.columns(3)
+prompts = [
+    "چطور می‌تونم مهارت مذاکره‌م رو بهتر کنم؟",
+    "یه مسیر یادگیری برای هوش مصنوعی پیشنهاد بده.",
+    "چطور در تصمیم‌گیری‌هام منطقی‌تر عمل کنم؟"
+]
+selected_prompt = None
+with col1:
+    if st.button(prompts[0], key="q1"):
+        selected_prompt = prompts[0]
+with col2:
+    if st.button(prompts[1], key="q2"):
+        selected_prompt = prompts[1]
+with col3:
+    if st.button(prompts[2], key="q3"):
+        selected_prompt = prompts[2]
 
-# -------------------------
-# حافظه مکالمه در session_state
-# -------------------------
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# ====== فیلد ورودی ======
+user_input = st.text_area("✍️ بنویس:", value=selected_prompt or "", placeholder="سؤال یا موضوعت رو بنویس...")
 
-# -------------------------
-# دکمه شروع گفت‌وگوی جدید
-# -------------------------
-if st.button("🔄 شروع گفت‌وگوی جدید"):
-    st.session_state.chat_history = []
-    st.success("✅ گفت‌وگوی جدید شروع شد")
+# ====== ارسال درخواست ======
+if st.button("ارسال 🔹", use_container_width=True):
+    if user_input.strip():
+        with st.spinner("منتور در حال فکر کردنه 💭..."):
+            time.sleep(1.2)  # شبیه‌سازی پردازش
 
-st.write("")  # فاصلهٔ ظاهری
+            # اینجا بعداً به API واقعی وصل می‌کنی
+            response = f"""
+            🔸 خلاصه:
+            تمرکز کن روی درک نیاز طرف مقابل پیش از پاسخ دادن.
 
-# -------------------------
-# نمایش مکالمات قبلی
-# -------------------------
-for msg in st.session_state.chat_history:
-    if msg["role"] == "user":
-        st.markdown(f"🧍‍♀️ **تو:** {msg['content']}")
+            🔹 توضیح:
+            مذاکره مؤثر یعنی گوش دادن فعال و تحلیل انگیزه‌ها. سعی کن قبل از هر پیشنهاد، با سؤالات باز احساس و هدف فرد مقابل رو بفهمی.
+
+            🔹 پیشنهاد عملی:
+            تمرین کن هر روز با یکی از هم‌تیمی‌هات گفت‌وگو رو با یک سؤال درک‌محور شروع کنی.
+
+            🔹 نتیجه:
+            درک، پایهٔ تمام روابط مؤثره. می‌خوای همین مسیر رو باهم ادامه بدیم؟
+            """
+
+            st.markdown(f'<div class="response-box">{response}</div>', unsafe_allow_html=True)
     else:
-        st.markdown(f"🤖 **منتور:** {msg['content']}")
-    st.divider()
+        st.warning("لطفاً قبل از ارسال، یک سؤال بنویس.")
 
-# -------------------------
-# ورودی چت
-# -------------------------
-user_input = st.chat_input("سؤالت رو بنویس یا حرف دلت رو بزن...")
-
-if user_input:
-    # پیام کاربر
-    st.session_state.chat_history.append({"role": "user", "content": user_input})
-    st.markdown(f"🧍‍♀️ **تو:** {user_input}")
-    st.divider()
-
-    # کل گفت‌وگو (user + assistant) برای context
-    context_chunks = [
-        f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history
-    ]
-
-    # پاسخ مدل
-    with st.spinner("منتور داره فکر می‌کنه… 🤔"):
-        try:
-            answer = generate_answer(user_input, context_chunks)
-        except Exception as e:
-            answer = f"⚠️ خطا در پاسخ‌گویی: {e}"
-
-    # ذخیره پاسخ و نمایش
-    st.session_state.chat_history.append({"role": "assistant", "content": answer})
-    st.markdown(f"🤖 **منتور:** {answer}")
-    st.divider()
+# ====== پانوشت ======
+st.markdown("---")
+st.caption("🌿 ساخته شده با عشق در مؤسسه آموزش عالی آزاد امین")
 
 #FEYZ
 #DEO
