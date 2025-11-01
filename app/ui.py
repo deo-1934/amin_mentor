@@ -1,10 +1,13 @@
+#FEYZ
+#DEO
 # app/ui.py
 # -*- coding: utf-8 -*-
 """
-Amin Mentor — End-User UI (Presentation Mode)
-- طراحی شیک، مینیمال و مناسب دمو برای کاربر نهایی
-- بدون نمایش جزئیات فنی (Health/Debug)
-- ورودی ساده، پاسخ تمیز، منابع اختیاری، تاریخچهٔ گفتگو و خروجی Markdown
+Amin Mentor — End-User UI (Presentation Mode, no source-count control)
+- طراحی شیک و مینیمال برای کاربر نهایی
+- بدون نمایش جزئیات فنی/دیباگ
+- بدون کنترل «تعداد منابع» (به‌صورت داخلی روی 4)
+- پاسخ آفلاین: هیچ API خارجی لازم نیست
 """
 
 from __future__ import annotations
@@ -33,10 +36,7 @@ st.set_page_config(
 # ---------------------- Style ---------------------------
 _CUSTOM_CSS = """
 <style>
-/* Container */
 .block-container { padding-top: 1.25rem !important; }
-
-/* Hero */
 .hero {
   padding: 1.2rem 1.4rem;
   border-radius: 18px;
@@ -47,8 +47,6 @@ _CUSTOM_CSS = """
   background: radial-gradient(80% 80% at 50% 0%, rgba(30,30,30,0.7), rgba(30,30,30,0.5));
   border-color: rgba(255,255,255,0.1);
 }
-
-/* Bubbles */
 .bubble {
   border: 1px solid rgba(120,120,120,0.2);
   border-radius: 16px;
@@ -58,8 +56,6 @@ _CUSTOM_CSS = """
 }
 .user { background: rgba(120, 180, 255, 0.14); }
 .bot  { background: rgba(140, 255, 200, 0.12); }
-
-/* Sources */
 .source {
   border-left: 3px solid rgba(120,120,120,0.35);
   padding: .5rem .75rem;
@@ -69,16 +65,6 @@ _CUSTOM_CSS = """
   background: rgba(0,0,0,0.02);
 }
 [data-theme="dark"] .source { background: rgba(255,255,255,0.02); }
-
-/* Small UI details */
-.pill {
-  display: inline-block;
-  padding: 0.12rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid rgba(120,120,120,0.25);
-  font-size: .78rem;
-  margin-left: .25rem;
-}
 .footer-note { opacity: .75; font-size: .85rem; }
 </style>
 """
@@ -105,7 +91,7 @@ def _source_title(meta: Dict[str, Any]) -> str:
     return "منبع"
 
 @st.cache_data(show_spinner=False)
-def _retrieve(query: str, k: int) -> List[Dict[str, Any]]:
+def _retrieve(query: str, k: int = 4) -> List[Dict[str, Any]]:
     # tolerant to slight signature differences
     items = []
     if hasattr(retriever, "retrieve"):
@@ -129,12 +115,13 @@ def _retrieve(query: str, k: int) -> List[Dict[str, Any]]:
         norm.append({"text": text, "score": score, "meta": meta})
     return norm
 
-def _generate(question: str, context_texts: List[str], max_new_tokens: int) -> str:
+def _generate(question: str, context_texts: List[str], max_new_tokens: int = 256) -> str:
+    # Prefer offline generate_answer if available
     if hasattr(generator, "generate_answer"):
         return generator.generate_answer(question, context_texts, max_new_tokens=max_new_tokens)  # type: ignore
     if hasattr(generator, "generate_hybrid_answer"):
         return generator.generate_hybrid_answer(question, context_texts, max_new_tokens=max_new_tokens)  # type: ignore
-    # offline minimal fallback
+    # offline minimal fallback (no API)
     joined = "\n\n".join(context_texts[:3]) if context_texts else "—"
     return (
         f"سؤال: {question}\n\n"
@@ -155,8 +142,10 @@ def _export_markdown() -> bytes:
                 lines.append(f"{i}. {title}: {preview}")
             lines.append("")
         lines.append("---\n")
-    buf = "\n".join(lines).encode("utf-8")
-    return buf
+    return ("\n".join(lines)).encode("utf-8")
+
+#FEYZ
+#DEO
 
 # ---------------------- Hero ----------------------------
 col1, col2 = st.columns([0.75, 0.25])
@@ -174,26 +163,19 @@ with col2:
     st.markdown(
         f"<div style='text-align:center' class='hero'>"
         f"<div>وضعیت سرویس</div>"
-        f"<div style='margin-top:.35rem'>"
-        f"<span class='pill'>آفلاینِ امن</span>"
-        f"<span class='pill'>بدون API خارجی</span>"
-        f"</div></div>",
+        f"<div style='margin-top:.35rem'>آفلاینِ امن · بدون API خارجی</div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
 st.divider()
 
-# ---------------------- Controls ------------------------
-c1, c2, c3 = st.columns([0.55, 0.2, 0.25])
-with c1:
-    question = st.text_input(
-        "سؤال شما",
-        placeholder="مثلاً: «منتور شخصی امین چه کاری انجام می‌دهد؟»",
-    )
-with c2:
-    top_k = st.selectbox("تعداد منابع", options=[3, 4, 5, 6], index=1)
-with c3:
-    show_sources = st.checkbox("نمایش منابع", value=True)
+# ---------------------- Controls (no source-count UI) ---
+question = st.text_input(
+    "سؤال شما",
+    placeholder="مثلاً: «منتور شخصی امین چه کاری انجام می‌دهد؟»",
+)
+show_sources = st.checkbox("نمایش منابع", value=True)
 
 run_col, clear_col, export_col = st.columns([0.25, 0.25, 0.5])
 with run_col:
@@ -225,16 +207,14 @@ if ask:
 
         with st.spinner("در حال جست‌وجوی منابع مرتبط…"):
             t0 = time.time()
-            retrieved = _retrieve(q, k=int(top_k))
-            t_retr = time.time() - t0
+            retrieved = _retrieve(q, k=4)  # ثابت: 4 منبع
+            _ = time.time() - t0
 
         sources_for_turn = retrieved if show_sources else []
 
         with st.spinner("در حال تولید پاسخ…"):
             ctx = [x.get("text", "") for x in retrieved]
-            t0 = time.time()
             answer = _generate(q, ctx, max_new_tokens=256)
-            t_gen = time.time() - t0
 
         st.session_state.last_answer = answer
         st.session_state.chat.append(
