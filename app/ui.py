@@ -1,87 +1,69 @@
+#FEYZ
+#DEO
 import streamlit as st
 from app.generator import generate_answer
-from datetime import datetime
 
 # -------------------------
 # تنظیمات صفحه
 # -------------------------
-st.set_page_config(
-    page_title="منتور شخصی امین",
-    page_icon="🧠",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="منتور شخصی امین", page_icon="🧠", layout="centered")
+
+st.title("🧠 منتور شخصی امین")
+st.caption("یک دوست  در کنارت 💬")
 
 # -------------------------
-# توابع کمکی
-# -------------------------
-def clear_chat_history():
-    """پاک کردن تاریخچه چت"""
-    st.session_state.chat_history = []
-    st.rerun()
-
-def display_message(role: str, content: str):
-    """نمایش پیام با فرمت مناسب"""
-    avatar = "🧍‍♀️" if role == "user" else "🤖"
-    with st.chat_message(role):
-        st.markdown(f"**{avatar} {role.capitalize()}:** {content}")
-
-def get_context() -> list[str]:
-    """استخراج متن پاسخ‌های قبلی منتور برای استفاده به عنوان context"""
-    return [
-        msg["content"]
-        for msg in st.session_state.chat_history
-        if msg["role"] == "assistant"
-    ]
-
-# -------------------------
-# تنظیمات اولیه
+# حافظه مکالمه در session_state
 # -------------------------
 if "chat_history" not in st.session_state:
+    # هر آیتم در این لیست شامل نقش و محتواست
     st.session_state.chat_history = []
 
 # -------------------------
-# رابط کاربری
+# دکمه شروع گفت‌وگوی جدید
 # -------------------------
-st.title("🧠 منتور شخصی امین")
-st.caption("یک دوست عاقل و کنار تو 💬")
+if st.button("🔄 شروع گفت‌وگوی جدید"):
+    st.session_state.chat_history = []
+    st.success("✅ گفت‌وگوی جدید شروع شد")
 
-# دکمه پاک کردن تاریخچه چت
-st.button(
-    "🔄 شروع گفت‌وگوی جدید",
-    on_click=clear_chat_history,
-    use_container_width=True,
-    type="primary"
-)
+st.write("")  # فاصلهٔ ظاهری
 
-# نمایش تاریخچه چت
+# -------------------------
+# نمایش مکالمات قبلی
+# -------------------------
 for msg in st.session_state.chat_history:
-    display_message(msg["role"], msg["content"])
+    if msg["role"] == "user":
+        st.markdown(f"🧍‍♀️ **تو:** {msg['content']}")
+    else:
+        st.markdown(f"🤖 **منتور:** {msg['content']}")
+    st.divider()
 
-# دریافت ورودی کاربر
-if user_input := st.chat_input("پیام خود را اینجا تایپ کنید..."):
-    # ثبت و نمایش پیام کاربر
+# -------------------------
+# ورودی چت
+# -------------------------
+user_input = st.chat_input("سؤالت رو بنویس یا حرف دلت رو بزن...")
+
+if user_input:
+    # ۱. پیام کاربر رو ذخیره کن و نشون بده
     st.session_state.chat_history.append({"role": "user", "content": user_input})
-    display_message("user", user_input)
+    st.markdown(f"🧍‍♀️ **تو:** {user_input}")
+    st.divider()
 
-    # دریافت پاسخ از منتور
-    with st.spinner("منتور در حال فکر کردن..."):
+    # ۲. ساخت context از کل گفتگو (کاربر + منتور)
+    context_chunks = [
+        f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history
+    ]
+
+    # ۳. تماس با مدل
+    with st.spinner("منتور داره فکر می‌کنه… 🤔"):
         try:
-            context = get_context()
-            answer = generate_answer(user_input, context)
+            answer = generate_answer(user_input, context_chunks)
         except Exception as e:
-            answer = f"⚠️ خطا در دریافت پاسخ: {str(e)}"
+            answer = f"⚠️ خطا در پاسخ‌گویی: {e}"
 
-    # ثبت و نمایش پاسخ منتور
+    # ۴. نمایش و ذخیرهٔ پاسخ منتور
     st.session_state.chat_history.append({"role": "assistant", "content": answer})
-    display_message("assistant", answer)
+    st.markdown(f"🤖 **منتور:** {answer}")
+    st.divider()
 
-# -------------------------
-# اطلاعات اضافی (اختیاری)
-# -------------------------
-with st.expander("⚙️ اطلاعات بیشتر"):
-    st.write("""
-    **منتور شخصی امین** یک دستیار هوشمند است که به سوالات شما پاسخ می‌دهد.
-    - برای شروع یک گفت‌وگوی جدید، روی دکمه "شروع گفت‌وگوی جدید" کلیک کنید.
-    - تاریخچه چت در حافظه موقت ذخیره می‌شود و با بستن صفحه پاک می‌شود.
-    """)
+#FEYZ
+#DEO
