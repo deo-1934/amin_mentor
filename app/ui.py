@@ -237,6 +237,7 @@ if st.session_state.chat:
                     meta = s.get("meta") or {}
                     title = _source_title(meta)
                     snippet = _snip(s.get("text", ""))
+                    
                     st.markdown(
                         f"<div class='source'><b>{i}. {title}</b><br>{snippet}</div>",
                         unsafe_allow_html=True,
