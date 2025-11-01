@@ -21,7 +21,7 @@ from app.generator import generate_answer
 st.set_page_config(page_title="منتور شخصی امین", page_icon="🧠", layout="centered")
 
 st.title("🧠 منتور شخصی امین")
-st.caption("یک دوست عاقل، صبور و همیشه در کنارت 💬")
+st.caption("یک دوست در کنارت 💬")
 
 # -------------------------
 # حافظه مکالمه در session_state
