@@ -1,7 +1,8 @@
+
 #FEYZ
 #DEO
 import streamlit as st
-from app.generator import generate_answer
+from .generator import generate_answer  # ایمپورت نسبی، این مهمه 👈
 
 # -------------------------
 # تنظیمات اولیه‌ی صفحه
@@ -9,61 +10,74 @@ from app.generator import generate_answer
 st.set_page_config(page_title="Amin Mentor", page_icon="🧠", layout="centered")
 
 st.title("🧠 منتور شخصی امین")
-st.caption("دوست عاقل، صبور و همیشه در کنارت 💬")
+st.caption("یک دوست عاقل و کنار تو 💬")
 
 # -------------------------
 # حافظه مکالمه در session_state
 # -------------------------
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []  # لیست از {"role": "user"/"assistant", "content": str}
+    # هر آیتم می‌شه {"role": "user" یا "assistant", "content": "متن"}
+    st.session_state.chat_history = []
 
 # -------------------------
-# تابع برای نمایش پیام‌ها
+# تابع نمایش پیام‌ها
 # -------------------------
 def render_messages():
     for msg in st.session_state.chat_history:
-        if msg["role"] == "user":
-            st.markdown(f"🧍‍♀️ **تو:** {msg['content']}")
+        role = msg["role"]
+        content = msg["content"]
+
+        if role == "user":
+            st.markdown(f"🧍‍♀️ **تو:** {content}")
         else:
-            st.markdown(f"🤖 **منتور:** {msg['content']}")
+            st.markdown(f"🤖 **منتور:** {content}")
+
         st.divider()
 
-# -------------------------
-# نمایش تاریخچه‌ی قبلی
-# -------------------------
+# پیام‌های قبلی رو نشون بده
 render_messages()
 
 # -------------------------
-# ورودی کاربر
+# ورودی چت
 # -------------------------
-user_input = st.chat_input("سؤالت رو بنویس...")
+user_input = st.chat_input("هرچی تو ذهنته همینجا بگو...")
 
 if user_input:
-    # افزودن پیام کاربر به حافظه
+    # 1. پیام کاربر رو ذخیره و نمایش بده
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     st.markdown(f"🧍‍♀️ **تو:** {user_input}")
     st.divider()
 
-    # ساخت زمینه (context) از همه پاسخ‌های قبلی
-    context = [msg["content"] for msg in st.session_state.chat_history if msg["role"] == "assistant"]
+    # 2. زمینه برای مدل:
+    # ما الان فقط پاسخ‌های قبلی منتور رو به عنوان context می‌فرستیم
+    # (ساده و کم‌هزینه. بعدا می‌تونیم گفت‌وگو رو کامل بفرستیم)
+    context_chunks = [
+        msg["content"]
+        for msg in st.session_state.chat_history
+        if msg["role"] == "assistant"
+    ]
 
-    # گرفتن پاسخ از مدل
-    with st.spinner("منتور در حال فکر کردن... 🤔"):
+    # 3. تولید جواب
+    with st.spinner("منتور داره فکر می‌کنه… 🤔"):
         try:
-            answer = generate_answer(user_input, context)
+            answer = generate_answer(
+                user_question=user_input,
+                context=context_chunks,
+            )
         except Exception as e:
-            answer = f"⚠️ خطا در پاسخ‌گویی: {e}"
+            answer = f"⚠️ یه خطا پیش اومد: {e}"
 
-    # نمایش و ذخیره پاسخ
+    # 4. جواب منتور رو ذخیره و نمایش بده
     st.session_state.chat_history.append({"role": "assistant", "content": answer})
     st.markdown(f"🤖 **منتور:** {answer}")
     st.divider()
 
 # -------------------------
-# دکمه پاک‌سازی گفتگو
+# ریست مکالمه
 # -------------------------
 if st.button("🔄 شروع گفت‌وگوی جدید"):
     st.session_state.chat_history = []
     st.experimental_rerun()
+
 #FEYZ
 #DEO
