@@ -1,8 +1,17 @@
-
 #FEYZ
 #DEO
+import os
+import sys
+
+# مسیر پوشه‌ی فعلی (همین app/)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# اگه این مسیر توی sys.path نیست، اضافه‌اش کن
+if CURRENT_DIR not in sys.path:
+    sys.path.append(CURRENT_DIR)
+
 import streamlit as st
-from .generator import generate_answer  # ایمپورت نسبی، این مهمه 👈
+from generator import generate_answer  # الان بدون نقطه ایمپورت می‌کنیم
 
 # -------------------------
 # تنظیمات اولیه‌ی صفحه
@@ -40,24 +49,23 @@ render_messages()
 # -------------------------
 # ورودی چت
 # -------------------------
-user_input = st.chat_input("هرچی تو ذهنته همینجا بگو...")
+user_input = st.chat_input("هرچی تو ذهنت هست همینجا بگو...")
 
 if user_input:
-    # 1. پیام کاربر رو ذخیره و نمایش بده
+    # 1. پیام کاربر رو ثبت و نمایش بده
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     st.markdown(f"🧍‍♀️ **تو:** {user_input}")
     st.divider()
 
     # 2. زمینه برای مدل:
-    # ما الان فقط پاسخ‌های قبلی منتور رو به عنوان context می‌فرستیم
-    # (ساده و کم‌هزینه. بعدا می‌تونیم گفت‌وگو رو کامل بفرستیم)
+    # فعلاً فقط جواب‌های قبلی منتور رو به عنوان context می‌فرستیم
     context_chunks = [
         msg["content"]
         for msg in st.session_state.chat_history
         if msg["role"] == "assistant"
     ]
 
-    # 3. تولید جواب
+    # 3. تولید جواب از مدل
     with st.spinner("منتور داره فکر می‌کنه… 🤔"):
         try:
             answer = generate_answer(
@@ -67,7 +75,7 @@ if user_input:
         except Exception as e:
             answer = f"⚠️ یه خطا پیش اومد: {e}"
 
-    # 4. جواب منتور رو ذخیره و نمایش بده
+    # 4. جواب منتور رو ثبت و نمایش بده
     st.session_state.chat_history.append({"role": "assistant", "content": answer})
     st.markdown(f"🤖 **منتور:** {answer}")
     st.divider()
