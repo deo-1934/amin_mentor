@@ -1,123 +1,111 @@
 #FEYZ
 #DEO
 import streamlit as st
+import json
 import requests
-import time
 
-# ====== تنظیمات اولیه صفحه ======
+# تنظیمات اولیه صفحه
 st.set_page_config(
     page_title="منتور شخصی امین",
-    page_icon="🌿",
+    page_icon="🎓",
     layout="centered"
 )
 
-# ====== استایل اختصاصی ======
+# استایل سفارشی (حرفه‌ای و رسمی)
 st.markdown("""
     <style>
         body {
-            background-color: #f8f9fa;
+            direction: rtl;
+            text-align: right;
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #0E1117;
+            color: #EDEDED;
         }
-        .main-title {
-            font-size: 2.1rem;
-            font-weight: 700;
-            color: #2c3e50;
-            text-align: center;
-            margin-bottom: 0.5rem;
+        .stTextInput textarea {
+            direction: rtl;
+            text-align: right;
         }
-        .subtitle {
-            text-align: center;
-            color: #6c757d;
-            margin-bottom: 2rem;
-            font-size: 1rem;
-        }
-        .prompt-box {
-            border: 1px solid #e1e1e1;
+        .mentor-box {
+            border: 1px solid #30363D;
             border-radius: 12px;
-            padding: 0.8rem 1rem;
-            background-color: #ffffff;
+            background-color: #161B22;
+            padding: 20px;
+            margin-top: 10px;
         }
-        .quick-prompts {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 1.5rem;
+        .mentor-header {
+            font-weight: bold;
+            color: #58A6FF;
+            margin-bottom: 10px;
         }
-        .quick-btn {
-            background-color: #e9f5ff;
-            color: #0078d7;
-            border: none;
-            border-radius: 10px;
-            padding: 0.5rem 0.8rem;
-            cursor: pointer;
-            transition: 0.2s;
+        .mentor-intro {
+            color: #D2D2D2;
+            margin-bottom: 6px;
         }
-        .quick-btn:hover {
-            background-color: #0078d7;
-            color: white;
+        .mentor-core {
+            color: #FFFFFF;
+            margin-bottom: 6px;
         }
-        .response-box {
-            margin-top: 1rem;
-            padding: 1rem;
-            background-color: #f1f3f4;
-            border-radius: 10px;
-            border-left: 5px solid #0078d7;
+        .mentor-outro {
+            color: #A0A0A0;
+            font-style: italic;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# ====== عنوان و توضیح ======
-st.markdown('<div class="main-title">منتور شخصی امین</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">همراه هوشمند شما در مسیر رشد، یادگیری و تصمیم‌گیری</div>', unsafe_allow_html=True)
+# عنوان بالای صفحه
+st.markdown("<h3 style='text-align:center; color:#58A6FF;'>منتور شخصی امین 🎓</h3>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#AAAAAA;'>همراه هوشمند شما در مسیر رشد، یادگیری و تصمیم‌گیری</p>", unsafe_allow_html=True)
 
-# ====== پیشنهاد سؤالات آماده ======
-col1, col2, col3 = st.columns(3)
-prompts = [
-    "چطور می‌تونم مهارت مذاکره‌م رو بهتر کنم؟",
-    "یه مسیر یادگیری برای هوش مصنوعی پیشنهاد بده.",
-    "چطور در تصمیم‌گیری‌هام منطقی‌تر عمل کنم؟"
-]
-selected_prompt = None
-with col1:
-    if st.button(prompts[0], key="q1"):
-        selected_prompt = prompts[0]
-with col2:
-    if st.button(prompts[1], key="q2"):
-        selected_prompt = prompts[1]
-with col3:
-    if st.button(prompts[2], key="q3"):
-        selected_prompt = prompts[2]
+# گزینه‌های آماده (پیشنهاد پرسش)
+cols = st.columns(3)
+cols[0].button("چطور در تصمیم‌گیری‌هام منطقی‌تر عمل کنم؟")
+cols[1].button("به مسیر یادگیری برای هوش مصنوعی پیشنهاد بده")
+cols[2].button("چطور می‌تونم مهارت خلاقیت خودم رو بهتر کنم؟")
 
-# ====== فیلد ورودی ======
-user_input = st.text_area("✍️ بنویس:", value=selected_prompt or "", placeholder="سؤال یا موضوعت رو بنویس...")
+# ورودی کاربر
+user_input = st.text_area("پرسش یا دغدغه‌ی خود را بنویسید:", placeholder="مثلاً: چطور تمرکز خودم را هنگام مطالعه حفظ کنم؟")
 
-# ====== ارسال درخواست ======
-if st.button("ارسال 🔹", use_container_width=True):
-    if user_input.strip():
-        with st.spinner("منتور در حال فکر کردنه 💭..."):
-            time.sleep(1.2)  # شبیه‌سازی پردازش
-
-            # اینجا بعداً به API واقعی وصل می‌کنی
-            response = f"""
-            🔸 خلاصه:
-            تمرکز کن روی درک نیاز طرف مقابل پیش از پاسخ دادن.
-
-            🔹 توضیح:
-            مذاکره مؤثر یعنی گوش دادن فعال و تحلیل انگیزه‌ها. سعی کن قبل از هر پیشنهاد، با سؤالات باز احساس و هدف فرد مقابل رو بفهمی.
-
-            🔹 پیشنهاد عملی:
-            تمرین کن هر روز با یکی از هم‌تیمی‌هات گفت‌وگو رو با یک سؤال درک‌محور شروع کنی.
-
-            🔹 نتیجه:
-            درک، پایهٔ تمام روابط مؤثره. می‌خوای همین مسیر رو باهم ادامه بدیم؟
-            """
-
-            st.markdown(f'<div class="response-box">{response}</div>', unsafe_allow_html=True)
+# دکمه ارسال
+if st.button("ارسال"):
+    if not user_input.strip():
+        st.warning("لطفاً ابتدا پرسش خود را بنویسید.")
     else:
-        st.warning("لطفاً قبل از ارسال، یک سؤال بنویس.")
+        with st.spinner("در حال دریافت پاسخ منتور..."):
+            try:
+                # درخواست به API مدل
+                API_URL = st.secrets.get("MODEL_ENDPOINT", "")
+                API_KEY = st.secrets.get("HF_TOKEN", "")
+                headers = {"Authorization": f"Bearer {API_KEY}"}
+                payload = {"inputs": user_input}
 
-# ====== پانوشت ======
-st.markdown("---")
-st.caption("🌿 ساخته شده با عشق در مؤسسه آموزش عالی آزاد امین")
+                response = requests.post(API_URL, headers=headers, json=payload)
+                result = response.json()
+
+                # اگر مدل خروجی JSON داده باشد
+                if isinstance(result, dict):
+                    output_text = result.get("generated_text") or json.dumps(result)
+                else:
+                    output_text = result[0].get("generated_text", "")
+
+                # تلاش برای پارس JSON خروجی
+                try:
+                    data = json.loads(output_text)
+                    tone = data.get("tone", "academic")
+                    msg = data.get("message", {})
+
+                    st.markdown("<div class='mentor-box'>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='mentor-header'>🎓 منتور ({tone})</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='mentor-intro'>{msg.get('intro', '')}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='mentor-core'>{msg.get('core', '')}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='mentor-outro'>{msg.get('outro', '')}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                except json.JSONDecodeError:
+                    st.error("⚠️ فرمت پاسخ مدل معتبر نیست. لطفاً قالب JSON را در generator بررسی کنید.")
+                    st.write(output_text)
+
+            except Exception as e:
+                st.error(f"خطایی رخ داد: {str(e)}")
 
 #FEYZ
 #DEO
