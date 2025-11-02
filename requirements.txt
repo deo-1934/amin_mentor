@@ -1,9 +1,5 @@
-# Amin Mentor - Streamlit Cloud Requirements
-# lightweight deps only for public demo
-
-streamlit==1.39.0
-numpy==1.26.4
-requests==2.32.3
-python-dotenv==1.0.1
-openai>=1.35.0
+fastapi
 uvicorn
+python-dotenv
+pydantic
+openai
