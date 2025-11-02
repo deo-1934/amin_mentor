@@ -1,28 +1,53 @@
-# app/main.py
-from __future__ import annotations
+#FEYZ
+#DEO
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-from app.router_chat import router as chat_router
-from app.generator import healthcheck as gen_health
+from app.generator import generate_answer
 
-app = FastAPI(title="Amin Mentor API", version="0.1.0")
+# مدل ورودی برای /chat
+class ChatRequest(BaseModel):
+    message: str
+    creative_level: int
+    max_new_tokens: int
 
-# CORS برای UI لوکال
+app = FastAPI(
+    title="Amin Mentor API",
+    description="Backend for Amin Mentor front-end chat",
+    version="0.1.0",
+)
+
+# CORS برای اینکه index.html محلی بتونه بهش POST بزنه
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # در دیپلوی نهایی محدودش کن
+    allow_origins=["*"],            # در فاز dev بازه
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/healthz")
-def healthz():
-    return {"ok": True, "generator": gen_health()}
+@app.get("/health")
+def health():
+    """
+    endpoint ساده برای تست سلامت.
+    فرانت مستقیم ازش استفاده نمی‌کنه ولی برای تست دستی خوبه.
+    """
+    return {"status": "ok", "msg": "server is alive ❤️"}
 
-@app.get("/version")
-def version():
-    return {"version": "0.1.0"}
+@app.post("/chat")
+def chat(req: ChatRequest):
+    """
+    این همون مسیریه که فرانت با fetch() صداش می‌زنه.
+    خروجی باید دقیقا شامل answer / contexts / took_ms باشه.
+    """
+    result = generate_answer(
+        message=req.message,
+        creative_level=req.creative_level,
+        max_new_tokens=req.max_new_tokens,
+    )
+    return result
 
-app.include_router(chat_router)
+#FEYZ
+#DEO
