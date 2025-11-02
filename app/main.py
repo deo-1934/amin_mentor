@@ -1,24 +1,26 @@
 #FEYZ
 #DEO
-# -*- coding: utf-8 -*-
-
-from dotenv import load_dotenv
-load_dotenv()
+import os
+from typing import Literal, List, Dict, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import time
-from typing import Optional, List
+from dotenv import load_dotenv
+from openai import OpenAI
 
-from app.generator import generate_answer  # بدون تغییر در فایل تو
+# .env رو لود کن
+load_dotenv()
 
-app = FastAPI(
-    title="Amin Mentor API",
-    description="Backend for Amin Mentor front-end chat",
-    version="0.3.0",
-)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL_CHEAP = os.getenv("OPENAI_MODEL_CHEAP", "gpt-4o-mini")
+MODEL_DEEP = os.getenv("OPENAI_MODEL_DEEP", "gpt-4o-mini")
 
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+app = FastAPI()
+
+# اجازه دسترسی فرانت (حتی وقتی با file:// باز شده)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,89 +29,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# حافظه مکالمه در حافظهٔ سرور (تا وقتی uvicorn روشنه)
+if not hasattr(app.state, "memory"):
+    app.state.memory = []  # list[{"role": "...", "content": "..."}]
 
 class ChatRequest(BaseModel):
     message: str
-    creative_level: int
-    max_new_tokens: int
-    force_new: Optional[bool] = False  # جدید: آیا کاربر می‌خواد جواب جدید تولید بشه؟
+    length: Literal["short", "normal", "long"] = "short"
 
+class ChatResponse(BaseModel):
+    answer: str
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "msg": "server is alive ❤️"}
+def build_length_instruction(length: str) -> str:
+    if length == "short":
+        return "پاسخ را خیلی کوتاه و مستقیم بده (۲ تا ۳ جمله خلاصه و اجرایی)."
+    elif length == "long":
+        return (
+            "پاسخ را طولانی‌تر و مرحله‌به‌مرحله بده. دلیل هر قدم را هم توضیح بده. "
+            "حداقل ۵-۶ جمله بنویس. مثال هم بزن."
+        )
+    else:
+        return "پاسخ را شفاف و اجرایی بده در حد ۳ تا ۴ جمله. مستقیم باش."
 
-
-@app.post("/chat")
+@app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    t0 = time.time()
+    user_question = req.message.strip()
+    style_hint = build_length_instruction(req.length)
 
-    # map خلاقیت -> دما
-    level = req.creative_level
-    if level < 1:
-        level = 1
-    if level > 5:
-        level = 5
+    if not user_question:
+        return {"answer": "سوال خالی بود. یک سوال واقعی بپرس 🙂"}
 
-    temp_simple_map = {1: 0.15, 2: 0.20, 3: 0.25, 4: 0.30, 5: 0.35}
-    temp_deep_map   = {1: 0.20, 2: 0.30, 3: 0.40, 4: 0.50, 5: 0.60}
+    # اضافه کردن پیام کاربر به حافظه
+    app.state.memory.append({
+        "role": "user",
+        "content": user_question
+    })
 
-    temperature_simple = temp_simple_map[level]
-    temperature_deep   = temp_deep_map[level]
+    # ما فقط آخرین ~6 پیام را می‌فرستیم به مدل تا هزینه و طول کنترل شود
+    recent_dialog: List[Dict[str, Any]] = app.state.memory[-6:]
 
-    # map طول پاسخ -> max tokens
-    def clamp(v, lo, hi):
-        return max(lo, min(hi, v))
+    # پیام system + تاریخچه
+    messages_for_model = [
+        {
+            "role": "system",
+            "content": (
+                "تو «منتور شخصی امین» هستی. خیلی کاربردی، واضح و بدون حاشیه جواب می‌دهی. "
+                "تم تمرکز: بیزینس، فروش، مذاکره، تصمیم‌گیری. "
+                "جواب باید قابل‌اجرا باشد. اگر سوال مبهم بود، اول سوال را واضح کن. "
+                "از تئوری خالص بدون عمل قابل انجام پرهیز کن."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                f"طول پاسخ مورد انتظار کاربر: {req.length}. "
+                f"{style_hint}"
+            ),
+        },
+    ] + recent_dialog
 
-    user_budget = req.max_new_tokens
-    max_simple = clamp(user_budget // 2, 64, 256)
-    max_deep   = clamp(user_budget,       128, 768)
+    # تماس با مدل
+    completion = client.chat.completions.create(
+        model=MODEL_CHEAP,
+        messages=messages_for_model,
+        temperature=0.6,
+        max_tokens=500,
+    )
 
-    # هنوز context نداریم
-    context_blocks: Optional[List[str]] = None
+    raw_answer = ""
+    if completion.choices and completion.choices[0].message:
+        raw_answer = (completion.choices[0].message.content or "").strip()
 
-    try:
-        # اینجا تغییر اصلی:
-        raw_answer_str = generate_answer(
-            query=req.message,
-            context=context_blocks,
-            temperature_simple=temperature_simple,
-            temperature_deep=temperature_deep,
-            max_tokens_simple=max_simple,
-            max_tokens_deep=max_deep,
-            # این آرگومان جدید رو پایین تو generator اضافه می‌کنیم:
-            force_new=req.force_new or False,
+    if raw_answer == "":
+        raw_answer = (
+            "الان نتونستم جواب مناسب تولید کنم. لطفاً دوباره بپرس یا مشخص‌تر بگو دقیقا کجا گیر کردی."
         )
 
-        safe_text = (str(raw_answer_str or "").strip())
-        if not safe_text:
-            safe_text = (
-                "پیامت رسید ولی جواب نهایی تولید نشد. "
-                "یه بار دیگه بگو الان دقیقاً کجا قفل شدی؟ "
-                "فروش؟ قیمت‌گذاری؟ یا اعتماد به نفس جلوی مشتری؟"
-            )
+    # پاسخ مدل هم به حافظه اضافه می‌شود
+    app.state.memory.append({
+        "role": "assistant",
+        "content": raw_answer
+    })
 
-        took_ms = int((time.time() - t0) * 1000)
-
-        return {
-            "answer": safe_text,
-            "contexts": [],
-            "took_ms": took_ms,
-        }
-
-    except Exception:
-        took_ms = int((time.time() - t0) * 1000)
-        fallback_text = (
-            "فعلاً دسترسی مستقیم به مدل برقرار نشد، "
-            "ولی پیام تو رو دارم 🌿\n"
-            "بگو الان مشکل اصلی دقیقا کجاست؟ "
-            "۱. مشتری قانع نمی‌شه ۲. قیمت رو له می‌کنن ۳. اعتماد به نفس جلوی مشتری؟"
-        )
-        return {
-            "answer": fallback_text,
-            "contexts": [],
-            "took_ms": took_ms,
-        }
-
-#FEYZ
-#DEO
+    return {"answer": raw_answer}
