@@ -1,953 +1,326 @@
 <!--
 #FEYZ
 #DEO
--->
 
+Landing page "Amin Mentor"
+Full-screen aurora bg with smooth continuous animation + in-card chat prototype.
+-->
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>منتور شخصی امین 🤖</title>
-
+  <title>منتور شخصی امین | Amin Mentor</title>
   <style>
-    :root {
-      --text-main: #e2e8f0;
-      --text-dim: #94a3b8;
-      --accent: #38bdf8;
-
-      --panel-bg: rgba(15,23,42,0.4);
-      --panel-border: rgba(148,163,184,0.18);
-      --panel-blur: blur(16px);
-
-      --bubble-user-bg: rgba(37, 58, 91, 0.6);
-      --bubble-user-border: rgba(148,163,184,0.28);
-
-      --bubble-bot-bg: rgba(15,23,42,0.55);
-      --bubble-bot-border: rgba(148,163,184,0.18);
-
-      --radius-lg: 16px;
-      --radius-xl: 18px;
-      --radius-full: 999px;
-
-      --font-main: system-ui, -apple-system, BlinkMacSystemFont,
-        "IRANSans", "Inter", Roboto, "Segoe UI", sans-serif;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-
-    * { box-sizing: border-box; }
 
     body {
-      margin: 0;
       min-height: 100vh;
-      color: var(--text-main);
-      font-family: var(--font-main);
-      background: #0b1120; /* fallback در صورت باگ رندر */
-      overflow-x: hidden;
+      font-family: system-ui, -apple-system, "Vazirmatn", sans-serif;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      overflow: hidden;
     }
 
-    /* =========================
-       🔥 AURORA 2.0 - پس‌زمینه متحرک واقعی
-       دو لایه نور + حرکت + تغییر تدریجی رنگ
-       ========================= */
-
-    /* لایه‌ اول: توده‌های نرم و بزرگ شفق */
-    .aurora-bg {
+    /* پس‌زمینه شفق قطبی */
+    .aurora-wrapper {
       position: fixed;
       inset: 0;
-      z-index: 0;
+      overflow: hidden;
       background:
-        radial-gradient(circle at 20% 20%, rgba(16,185,129,0.4) 0%, rgba(0,0,0,0) 60%),
-        radial-gradient(circle at 80% 30%, rgba(59,130,246,0.45) 0%, rgba(0,0,0,0) 60%),
-        radial-gradient(circle at 50% 80%, rgba(147,51,234,0.4) 0%, rgba(0,0,0,0) 60%);
+        radial-gradient(circle at 20% 20%, rgba(0,255,180,0.45) 0%, rgba(0,0,0,0) 60%),
+        radial-gradient(circle at 80% 30%, rgba(120,70,255,0.4) 0%, rgba(0,0,0,0) 60%),
+        radial-gradient(circle at 50% 80%, rgba(255,80,180,0.35) 0%, rgba(0,0,0,0) 60%),
+        radial-gradient(circle at 30% 90%, rgba(0,160,255,0.25) 0%, rgba(0,0,0,0) 70%),
+        radial-gradient(circle at 70% 70%, rgba(0,255,120,0.2) 0%, rgba(0,0,0,0) 70%);
       background-blend-mode: screen;
-      filter: blur(80px);
-      opacity: 0.55;
-      animation: auroraMove 28s ease-in-out infinite;
-      pointer-events: none;
-    }
-
-    /* لایه دوم: رگه‌های کشیده‌ی نور، با تغییر رنگ در طول زمان */
-    .aurora-glow {
-      position: fixed;
-      inset: 0;
+      filter: blur(60px) saturate(140%) hue-rotate(0deg);
+      animation: auroraMotion 18s ease-in-out infinite alternate;
       z-index: 0;
-      background: linear-gradient(
-        120deg,
-        rgba(59,130,246,0.35) 0%,
-        rgba(16,185,129,0.3) 25%,
-        rgba(147,51,234,0.35) 50%,
-        rgba(16,185,129,0.3) 75%,
-        rgba(59,130,246,0.35) 100%
-      );
-      background-size: 300% 300%;
-      mix-blend-mode: screen;
-      filter: blur(120px);
-      opacity: 0.5;
-      animation: gradientFlow 18s ease-in-out infinite;
-      pointer-events: none;
     }
 
-    /* لایه سوم: یه سایه ملایم برای خوانایی متن */
-    .dim-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      background: radial-gradient(
-        circle at 50% 20%,
-        rgba(0,0,0,0) 0%,
-        rgba(0,0,0,0.7) 60%
-      );
-      pointer-events: none;
-    }
-
-    /* حرکت آرام و تنفسی توده‌های شفق */
-    @keyframes auroraMove {
-      0%   { transform: translate3d(0,0,0) scale(1); }
-      25%  { transform: translate3d(-8%, -4%, 0) scale(1.1); }
-      50%  { transform: translate3d(10%, 6%, 0) scale(1.22); }
-      75%  { transform: translate3d(-4%, 4%, 0) scale(1.1); }
-      100% { transform: translate3d(0,0,0) scale(1); }
-    }
-
-    /* شفت پالت رنگ و اسلاید هاله‌ی نور */
-    @keyframes gradientFlow {
+    /* حرکت و تغییر رنگ پیوسته */
+    @keyframes auroraMotion {
       0% {
-        background-position: 0% 50%;
-        filter: blur(120px) hue-rotate(0deg);
+        transform: translate3d(0,0,0) scale(1);
+        filter: blur(60px) saturate(150%) hue-rotate(0deg);
       }
       25% {
-        background-position: 50% 30%;
-        filter: blur(130px) hue-rotate(40deg);
+        transform: translate3d(-2%, -3%, 0) scale(1.05);
+        filter: blur(60px) saturate(160%) hue-rotate(60deg);
       }
       50% {
-        background-position: 100% 50%;
-        filter: blur(140px) hue-rotate(80deg);
+        transform: translate3d(2%, 3%, 0) scale(1.1);
+        filter: blur(60px) saturate(150%) hue-rotate(120deg);
       }
       75% {
-        background-position: 50% 70%;
-        filter: blur(130px) hue-rotate(40deg);
+        transform: translate3d(-1%, 2%, 0) scale(1.05);
+        filter: blur(60px) saturate(160%) hue-rotate(180deg);
       }
       100% {
-        background-position: 0% 50%;
-        filter: blur(120px) hue-rotate(0deg);
+        transform: translate3d(1%, -2%, 0) scale(1.08);
+        filter: blur(60px) saturate(150%) hue-rotate(240deg);
       }
     }
 
-    /* =========================
-       لایه محتوای واقعی
-       ========================= */
-
-    .page-wrapper {
+    /* کارت اصلی */
+    .card {
       position: relative;
-      z-index: 2; /* بالای aurora و dim-overlay */
-      min-height: 100vh;
+      z-index: 1;
+      width: min(90%, 400px);
+      background: #2f2f2f; /* خاکستری ثابت */
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 1.5rem;
+      padding: 1.25rem 1.25rem 1rem;
+      box-shadow: 0 30px 100px rgba(0,0,0,0.8);
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 24px 16px 160px; /* جا برای نوار ورودی پایین */
+      gap: 1rem;
+      max-height: 90vh;
     }
 
-    /* INTRO / HEADER */
-    .intro-block {
-      max-width: 640px;
-      width: 100%;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .intro-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      line-height: 1.5;
-    }
-
-    .status-pill {
-      font-size: .65rem;
-      font-weight: 500;
-      color: #10b981;
-      background: rgba(16,185,129,0.12);
-      border: 1px solid rgba(16,185,129,0.4);
-      border-radius: var(--radius-full);
-      padding: 2px 8px;
-      line-height: 1.4;
-      margin-top: 4px;
-    }
-
-    .intro-card {
-      display: inline-block;
-      background: var(--panel-bg);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-lg);
-      backdrop-filter: var(--panel-blur);
-      -webkit-backdrop-filter: var(--panel-blur);
-      padding: 16px 20px;
-      text-align: right;
-      font-size: .9rem;
-      line-height: 1.6;
-      color: var(--text-main);
-      box-shadow: 0 30px 80px rgba(0,0,0,0.8);
-    }
-
-    .intro-mainline {
-      margin-bottom: 8px;
-      font-weight: 500;
-      font-size: .9rem;
-      color: var(--text-main);
-      line-height: 1.5;
-    }
-
-    .disclaimer {
-      font-size: .75rem;
-      color: var(--text-dim);
-      line-height: 1.5;
-      border-right: 2px solid rgba(148,163,184,0.25);
-      padding-right: 10px;
-      text-align: right;
-    }
-
-    /* CHAT AREA */
-    .chat-box {
-      width: 100%;
-      max-width: 700px;
-      min-height: 220px;
-      max-height: 50vh;
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      border-radius: var(--radius-lg);
-      border: 1px solid rgba(148,163,184,0.15);
-      background: rgba(10,15,26,0.4);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      box-shadow:
-        inset 0 0 40px rgba(0,0,0,0.8),
-        0 30px 80px rgba(0,0,0,0.8);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .msg-wrapper {
-      display: flex;
-      max-width: 85%;
-      filter: drop-shadow(0 20px 30px rgba(0,0,0,0.8));
-    }
-
-    .from-user {
-      align-self: flex-end;
-      flex-direction: column;
-      text-align: right;
-    }
-
-    .from-bot {
-      align-self: flex-start;
-      flex-direction: column;
-      text-align: right;
-    }
-
-    .bubble {
-      border-radius: var(--radius-xl);
-      padding: 12px 14px;
-      font-size: .9rem;
-      line-height: 1.6;
-      color: var(--text-main);
-      white-space: pre-wrap;
-      word-break: break-word;
-      border: 1px solid transparent;
-      box-shadow:
-        0 16px 40px rgba(0,0,0,0.8),
-        0 0 60px rgba(56,189,248,0.08);
-    }
-
-    .bubble.user {
-      background: var(--bubble-user-bg);
-      border: 1px solid var(--bubble-user-border);
-    }
-
-    .bubble.bot {
-      background: var(--bubble-bot-bg);
-      border: 1px solid var(--bubble-bot-border);
-    }
-
-    .bot-name {
+    .badge {
       font-size: .7rem;
-      font-weight: 600;
-      color: var(--accent);
-      margin-bottom: 6px;
-      line-height: 1.4;
-    }
-
-    .meta-line {
-      font-size: .65rem;
-      color: var(--text-dim);
-      margin-top: 6px;
-      line-height: 1.4;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .ctx-chip {
-      background: rgba(15,23,42,0.6);
-      border: 1px solid rgba(148,163,184,0.3);
-      border-radius: var(--radius-full);
-      padding: 2px 8px;
-      font-size: .6rem;
       font-weight: 500;
-      line-height: 1.4;
-      white-space: nowrap;
-      color: var(--text-main);
-    }
-
-    .typing-bubble {
-      background: rgba(15,23,42,0.4);
-      border: 1px solid rgba(148,163,184,0.2);
-      border-radius: var(--radius-xl);
-      padding: 10px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: .75rem;
-      color: var(--text-dim);
-      width: fit-content;
-    }
-
-    .dot {
-      width: 6px; height: 6px;
+      background: #444;
+      color: #00ffd9;
       border-radius: 999px;
-      background: var(--accent);
-      animation: blink 1s infinite;
+      padding: .4rem .8rem;
+      border: 1px solid rgba(255,255,255,.3);
+      align-self: flex-start;
+      line-height: 1.2;
     }
 
-    .dot:nth-child(2) { animation-delay: .2s; }
-    .dot:nth-child(3) { animation-delay: .4s; }
-
-    @keyframes blink {
-      0%,100% {opacity:.2;}
-      50% {opacity:1;}
+    h1 {
+      font-size: 1rem;
+      line-height: 1.5rem;
+      font-weight: 600;
+      color: #fff;
     }
 
-    /* =========================
-       نوار ورودی پایین صفحه
-       ========================= */
-    .input-area {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 3; /* روی aurora و صفحه */
+    .subtext {
+      font-size: .8rem;
+      line-height: 1.4rem;
+      color: rgba(255,255,255,0.85);
+    }
+
+    /* چت‌باکس */
+    .chat-shell {
+      background: #1e1e1e;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 1rem;
+      padding: .75rem;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 16px;
+      min-height: 220px;
+      max-height: 300px;
+      flex: 1 1 auto;
     }
 
-    .input-shell {
-      width: 100%;
-      max-width: 700px;
-      background: rgba(15,23,42,0.5);
-      border: 1px solid rgba(148,163,184,0.2);
-      border-radius: var(--radius-xl);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      box-shadow:
-        0 30px 80px rgba(0,0,0,0.8),
-        0 0 60px rgba(56,189,248,0.4);
-      padding: 12px 16px;
+    .chat-messages {
+      flex: 1 1 auto;
+      overflow-y: auto;
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+      flex-direction: column;
+      gap: .75rem;
+      padding-inline-end: .5rem;
+    }
+
+    /* حباب پیام ها */
+    .msg {
+      max-width: 85%;
+      font-size: .8rem;
+      line-height: 1.4rem;
+      border-radius: .9rem;
+      padding: .6rem .8rem .7rem;
+      word-break: break-word;
+      white-space: pre-line;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.8);
+    }
+
+    .msg.assistant {
+      align-self: flex-start;
+      background: #3a3a3a;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: #00ffd9;
+      color: #000;
+      font-weight: 500;
+      border: 1px solid rgba(0,0,0,.4);
+    }
+
+    .chat-input-row {
+      margin-top: .75rem;
+      display: flex;
+      gap: .5rem;
     }
 
     .chat-input {
-      flex: 1;
-      min-width: 200px;
-      min-height: 48px;
-      max-height: 120px;
-      background: transparent;
-      border: none;
-      color: var(--text-main);
-      font-family: inherit;
-      font-size: .9rem;
-      line-height: 1.5;
+      flex: 1 1 auto;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: .8rem;
+      line-height: 1.2rem;
+      border-radius: .7rem;
+      border: 1px solid rgba(255,255,255,.15);
+      padding: .7rem .8rem;
       outline: none;
-      resize: none;
+    }
+    .chat-input:focus {
+      border-color: #00ffd9;
+      box-shadow: 0 0 10px rgba(0,255,217,.5);
     }
 
     .send-btn {
-      background: var(--accent);
-      color: #0a0f1a;
-      border: 0;
-      border-radius: var(--radius-full);
+      flex: 0 0 auto;
+      background: #00ffd9;
+      color: #000;
+      border: none;
+      border-radius: .7rem;
+      padding: .7rem .9rem;
       font-size: .8rem;
       font-weight: 600;
-      padding: 10px 16px;
-      line-height: 1.2;
+      line-height: 1.2rem;
       cursor: pointer;
-      box-shadow:
-        0 20px 40px rgba(56,189,248,0.4),
-        0 0 60px rgba(56,189,248,0.5);
-      min-width: 80px;
-      align-self: flex-end;
+      transition: all .2s ease;
+    }
+    .send-btn:hover {
+      background: #7c6eff;
+      color: #fff;
+      transform: translateY(-2px);
     }
 
-    .hint-row {
+    /* خط پایینی کارت */
+    .meta {
       width: 100%;
-      max-width: 700px;
-      color: var(--text-dim);
-      font-size: .7rem;
-      line-height: 1.4;
-      padding-top: 8px;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      text-shadow: 0 2px 6px rgba(0,0,0,0.9);
-    }
-
-    /* =========================
-       دکمه تنظیمات پیشرفته + پنل
-       ========================= */
-    .settings-btn {
-      position: fixed;
-      bottom: 90px;
-      left: 16px;
-      z-index: 4; /* روی input-area */
-      background: rgba(15,23,42,0.5);
-      border: 1px solid rgba(148,163,184,0.3);
-      border-radius: var(--radius-full);
-      color: var(--text-main);
-      width: 36px;
-      height: 36px;
-      font-size: .8rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      line-height: 1;
-      box-shadow:
-        0 20px 40px rgba(0,0,0,0.8),
-        0 0 60px rgba(56,189,248,0.4);
-    }
-
-    .drawer {
-      position: fixed;
-      bottom: 140px;
-      left: 16px;
-      z-index: 5; /* بالاترین */
-      width: 240px;
-      max-width: 90%;
-      background: rgba(15,23,42,0.78);
-      border: 1px solid rgba(148,163,184,0.2);
-      border-radius: var(--radius-lg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 30px 80px rgba(0,0,0,0.9);
-      padding: 16px;
-      display: none;
-      flex-direction: column;
-      gap: 16px;
-      color: var(--text-main);
-    }
-
-    .drawer-head {
-      font-size: .8rem;
-      font-weight: 600;
-      color: var(--text-main);
-      line-height: 1.4;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 4px;
-    }
-
-    .drawer-close {
-      background: rgba(15,23,42,0.6);
-      border: 1px solid rgba(148,163,184,0.2);
-      border-radius: var(--radius-full);
-      color: var(--text-main);
-      width: 26px;
-      height: 26px;
-      font-size: .7rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      line-height: 1;
-    }
-
-    .drawer-sub {
-      color: var(--text-dim);
-      font-size: .7rem;
-      line-height: 1.4;
-      margin-bottom: 12px;
-    }
-
-    .drawer-field {
-      margin-bottom: 12px;
-    }
-
-    .drawer-field label {
-      font-size: .7rem;
-      color: var(--text-dim);
-      margin-bottom: 4px;
-      display: block;
-    }
-
-    .drawer-field .row-inline {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: .7rem;
-      color: var(--text-main);
-    }
-
-    .drawer-field input[type="range"],
-    .drawer-field select {
-      width: 100%;
-      background: rgba(15,23,42,0.6);
-      border: 1px solid rgba(148,163,184,0.2);
-      border-radius: var(--radius-lg);
-      color: var(--text-main);
-      padding: 6px 8px;
-      font-family: inherit;
-      font-size: .8rem;
-    }
-
-    .regen-btn {
-      background: rgba(15,23,42,0.5);
-      border: 1px solid rgba(148,163,184,0.3);
-      border-radius: var(--radius-full);
-      color: var(--text-main);
-      font-size: .7rem;
-      padding: 6px 10px;
-      cursor: pointer;
-      line-height: 1.2;
       text-align: center;
-      width: 100%;
-    }
-
-    .regen-hint {
       font-size: .7rem;
-      color: var(--text-dim);
-      line-height: 1.4;
-      margin-top: 6px;
-      text-align: right;
+      color: rgba(255,255,255,0.45);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: .75rem;
+      margin-top: .5rem;
+      line-height: 1.2rem;
     }
 
-    /* toast نوتیفیکیشن کوتاه */
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 140px;
-      z-index: 9999;
-      transform: translateX(-50%);
-      background: rgba(15,23,42,0.9);
-      border: 1px solid rgba(56,189,248,0.5);
-      color: var(--text-main);
-      border-radius: var(--radius-full);
-      padding: 8px 14px;
-      font-size: .75rem;
-      line-height: 1.3;
-      box-shadow:
-        0 30px 80px rgba(0,0,0,0.9),
-        0 0 120px rgba(56,189,248,0.4);
-      opacity: 0;
-      transition: opacity .4s;
-      pointer-events: none;
-      white-space: nowrap;
-    }
+    /* نشانه‌گذاری پروژه طبق قانون */
+    /*
+    #FEYZ
+    #DEO
 
-    .toast.show { opacity: 1; }
-
-    @media (max-width: 480px) {
-      .intro-card { font-size: .8rem; }
-      .disclaimer { font-size: .7rem; }
-      .chat-box { max-height: 45vh; }
-      .send-btn { min-width: 72px; font-size: .75rem; }
-      .hint-row { font-size: .65rem; }
-    }
+    این بلوک چت الان فقط سمت فرانت模ک (Mock) پاسخ می‌دهد.
+    در مرحله بعد فقط کافیست به جای پاسخ ساختگی،
+    خروجی API واقعی پروژه رو بگذاری.
+    */
   </style>
 </head>
 <body>
+  <!-- پس‌زمینه شفق -->
+  <div class="aurora-wrapper" aria-hidden="true"></div>
 
-<!-- لایه‌های پس‌زمینه شفق -->
-<div class="aurora-bg"></div>
-<div class="aurora-glow"></div>
-<div class="dim-overlay"></div>
+  <!-- کارت -->
+  <section class="card">
+    <span class="badge">منتور شخصی امین</span>
 
-<!-- محتوای صفحه -->
-<div class="page-wrapper">
+    <h1>یک مربی کنارته؛ دقیق، کاربردی و همیشه در دسترس.</h1>
 
-  <!-- معرفی/هدر -->
-  <div class="intro-block">
-    <div class="intro-title">
-      <div>منتور شخصی امین 🤖</div>
-      <div class="status-pill">online</div>
-    </div>
+    <p class="subtext">
+      بپرس. درباره کسب‌وکار، فروش، مذاکره یا تصمیم. من تلاش می‌کنم پاسخ روشن و قابل اجرا بدم.
+    </p>
 
-    <div class="intro-card">
-      <div class="intro-mainline">
-        سلام. من منتور شخصی امین هستم. الان مهم‌ترین دردسرت توی کسب‌وکارت چیه؟
+    <!-- بخش چت -->
+    <div class="chat-shell">
+      <div id="chatMessages" class="chat-messages">
+        <!-- پیام اولیه دستیار -->
+        <div class="msg assistant">
+          سلام، من منتور امین هستم. روی چه چالشی تو کسب‌وکارت الان گیر کردی؟
+        </div>
       </div>
-      <div class="disclaimer">
-        من سعی می‌کنم راه‌حل واقعی و مرحله‌به‌مرحله بدم.
-        اما باید بدونی من یک دستیار هوش مصنوعیم و اطلاعاتم صرفاً جنبهٔ آموزشی دارن
-        و جایگزین مشاور حقوقی، مالی یا وکیل رسمی نیستم.
+
+      <div class="chat-input-row">
+        <input
+          id="userInput"
+          class="chat-input"
+          type="text"
+          placeholder="سوالتو بنویس... مثلا: چطور مشتری رو قانع کنم زودتر تصمیم بگیره؟"
+        />
+        <button id="sendBtn" class="send-btn">ارسال</button>
       </div>
     </div>
-  </div>
 
-  <!-- فضای چت (شروع خالی) -->
-  <div id="chatBox" class="chat-box"></div>
-
-</div>
-
-<!-- نوار ورودی پایین صفحه -->
-<div class="input-area">
-  <div class="input-shell">
-    <textarea
-      id="chatInput"
-      class="chat-input"
-      placeholder="همین الان دقیقاً چه مشکلی داری؟ مثلا: من محصول دارم ولی هیچ فروشی ندارم."></textarea>
-
-    <button id="sendBtn" class="send-btn">ارسال</button>
-  </div>
-
-  <div class="hint-row">
-    <span>من اول یک جواب می‌نویسم ✍️ بعد همونو با منابع خودت چک می‌کنم 🔍</span>
-    <span>هدف: یک قدم عملی بعدی برای تو ✅</span>
-  </div>
-</div>
-
-<!-- دکمه ⚙️ و پنل تنظیمات -->
-<div class="settings-btn" id="settingsBtn" title="تنظیمات پیشرفته">⚙️</div>
-
-<div class="drawer" id="drawer">
-  <div class="drawer-head">
-    <div style="font-size:.8rem;font-weight:600;color:var(--text-main);line-height:1.4;">
-      تنظیمات پاسخ
+    <div class="meta">
+      نسخه‌ی دمو · Phase 1 (Front-End Mock)<br/>
+      اتصال به API در فاز بعد
     </div>
-    <div class="drawer-close" id="drawerCloseBtn">✕</div>
-  </div>
+  </section>
 
-  <div class="drawer-sub">
-    خلاقیت بالاتر = لحن صمیمی‌تر و مثال بیشتر.
-    خلاقیت پایین‌تر = رسمی‌تر و مستقیم‌تر.
-  </div>
+  <script>
+    // انتخاب المنت‌ها
+    const chatMessages = document.getElementById("chatMessages");
+    const userInput = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendBtn");
 
-  <div class="drawer-field">
-    <label for="creativeLevel">خلاقیت پاسخ</label>
-    <div class="row-inline">
-      <input type="range" id="creativeLevel" min="1" max="5" value="2" />
-      <span style="font-size:.7rem;color:var(--text-main);">
-        <span id="creativeVal">2</span>/5
-      </span>
-    </div>
-  </div>
+    // تابع اضافه کردن پیام به چت
+    function addMessage(text, role) {
+      const bubble = document.createElement("div");
+      bubble.classList.add("msg");
+      bubble.classList.add(role === "user" ? "user" : "assistant");
+      bubble.textContent = text;
+      chatMessages.appendChild(bubble);
 
-  <div class="drawer-field">
-    <label for="maxTokensSelect">حداکثر طول پاسخ</label>
-    <select id="maxTokensSelect">
-      <option value="256">کوتاه و جمع‌وجور</option>
-      <option value="512" selected>متوسط و کاربردی</option>
-      <option value="768">توضیح کامل</option>
-      <option value="1024">خیلی مفصل</option>
-    </select>
-  </div>
-
-  <div class="drawer-field">
-    <button class="regen-btn" id="regenBtn">🔁 بازتولید پاسخ آخر</button>
-    <div class="regen-hint">
-      همون سوال، با خروجی جدید.
-    </div>
-  </div>
-
-  <div class="drawer-field">
-    <button class="regen-btn" id="copyBtn">📋 کپی پاسخ آخر</button>
-  </div>
-
-  <div class="drawer-field">
-    <button class="regen-btn" id="exportBtn">💾 خروجی چت</button>
-  </div>
-
-  <div class="drawer-field">
-    <button class="regen-btn" id="clearChatBtn" style="color:#ef4444;border-color:#ef4444;">
-      🧹 پاک‌سازی مکالمه
-    </button>
-  </div>
-</div>
-
-<div id="toast" class="toast"></div>
-
-<!--
-#FEYZ
-#DEO
--->
-
-<script>
-  // refs
-  const chatBox = document.getElementById("chatBox");
-  const chatInput = document.getElementById("chatInput");
-  const sendBtn = document.getElementById("sendBtn");
-
-  const settingsBtn = document.getElementById("settingsBtn");
-  const drawer = document.getElementById("drawer");
-  const drawerCloseBtn = document.getElementById("drawerCloseBtn");
-
-  const creativeLevelEl = document.getElementById("creativeLevel");
-  const creativeValEl = document.getElementById("creativeVal");
-  const maxTokensSelect = document.getElementById("maxTokensSelect");
-
-  const regenBtn = document.getElementById("regenBtn");
-  const copyBtn = document.getElementById("copyBtn");
-  const exportBtn = document.getElementById("exportBtn");
-  const clearChatBtn = document.getElementById("clearChatBtn");
-
-  const toastEl = document.getElementById("toast");
-
-  // مکالمه روی فرانت
-  // هر آیتم: { role: "user"|"assistant", content:"...", meta? }
-  let history = [];
-  let lastAssistantRaw = "";
-
-  // آدرس بک‌اند FastAPI
-  const API_URL = "http://localhost:8000/chat";
-
-  // helpers
-  function scrollToBottom() {
-    chatBox.scrollTop = chatBox.scrollHeight;
-  }
-
-  function sanitize(html) {
-    const div = document.createElement("div");
-    div.textContent = html;
-    return div.innerHTML.replace(/\n/g, "<br>");
-  }
-
-  function appendUserMessage(text) {
-    const wrap = document.createElement("div");
-    wrap.className = "msg-wrapper from-user";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble user";
-    bubble.innerHTML = sanitize(text);
-
-    wrap.appendChild(bubble);
-    chatBox.appendChild(wrap);
-
-    history.push({ role: "user", content: text });
-    scrollToBottom();
-  }
-
-  function appendBotMessage(answerText, tookMs, contextsArray) {
-    const wrap = document.createElement("div");
-    wrap.className = "msg-wrapper from-bot";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble bot";
-
-    const name = document.createElement("div");
-    name.className = "bot-name";
-    name.textContent = "منتور شخصی امین ✳︎";
-    bubble.appendChild(name);
-
-    const body = document.createElement("div");
-    body.innerHTML = sanitize(answerText);
-    bubble.appendChild(body);
-
-    wrap.appendChild(bubble);
-
-    const meta = document.createElement("div");
-    meta.className = "meta-line";
-
-    if (tookMs !== null && tookMs !== undefined) {
-      const t = document.createElement("span");
-      t.textContent = `⏱ ${Math.round(tookMs)} ms`;
-      meta.appendChild(t);
+      // اسکرول به پایین
+      chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    (contextsArray || []).forEach(ctx => {
-      const chip = document.createElement("span");
-      chip.className = "ctx-chip";
-      const dist = typeof ctx.distance === "number"
-        ? ctx.distance.toFixed(3)
-        : (ctx.distance ?? "");
-      chip.textContent = `منبع #${ctx.id ?? "?"} · ${dist}`;
-      meta.appendChild(chip);
-    });
-
-    wrap.appendChild(meta);
-
-    chatBox.appendChild(wrap);
-
-    history.push({
-      role: "assistant",
-      content: answerText,
-      meta: { took_ms: tookMs || 0, contexts: contextsArray || [] }
-    });
-
-    lastAssistantRaw = answerText;
-    scrollToBottom();
-  }
-
-  function appendTypingIndicator() {
-    const wrap = document.createElement("div");
-    wrap.className = "msg-wrapper from-bot";
-    wrap.id = "typingIndicator";
-
-    const bubble = document.createElement("div");
-    bubble.className = "typing-bubble";
-    bubble.innerHTML = `
-      <span>در حال فکر کردن...</span>
-      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-    `;
-
-    wrap.appendChild(bubble);
-    chatBox.appendChild(wrap);
-    scrollToBottom();
-  }
-
-  function removeTypingIndicator() {
-    const el = document.getElementById("typingIndicator");
-    if (el) el.remove();
-  }
-
-  function showToast(msg) {
-    toastEl.textContent = msg;
-    toastEl.classList.add("show");
-    setTimeout(() => {
-      toastEl.classList.remove("show");
-    }, 1500);
-  }
-
-  async function askMentor(userText, {creative, maxTokens}, isRegen=false) {
-    appendTypingIndicator();
-
-    const payload = {
-      message: userText,
-      creative_level: Number(creative),
-      max_new_tokens: Number(maxTokens)
-    };
-
-    const t0 = performance.now();
-    let tookMs = null;
-
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      const t1 = performance.now();
-      tookMs = t1 - t0;
-
-      removeTypingIndicator();
-
-      const answerText = data.answer ?? "[پاسخی دریافت نشد]";
-      const ctxs = data.contexts ?? [];
-      const dur = data.took_ms ?? tookMs;
-
-      appendBotMessage(answerText, dur, ctxs);
-    } catch (err) {
-      console.error("API error:", err);
-      removeTypingIndicator();
-      appendBotMessage(
-        "الان به مدل وصل نیستم. یکم بعد دوباره بپرس 🌱 سوالت رو نگه داشتم.",
-        null,
-        []
+    // الگوریتم پاسخ موقت (سمت فرانت؛ بعدا جایگزین API میشه)
+    function generateMockReply(userText) {
+      // خیلی کوتاه و جدی و شبیه نسخه واقعی منتور
+      // تو فاز بک‌اند اینجا call می‌زنیم به مدل
+      return (
+        "نکته‌ اصلی اینه که باید اول ببینیم دقیقاً چه ارزشی براش حل می‌کنی." +
+        "\n" +
+        "خیلی خلاصه بگو الان طرف مقابل چه ترسی داره یا چرا دودله؟"
       );
     }
-  }
 
-  function handleSend(textOverride=null) {
-    const text = textOverride ?? chatInput.value.trim();
-    if (!text) return;
+    // ارسال پیام
+    function handleSend() {
+      const text = userInput.value.trim();
+      if (!text) return;
 
-    appendUserMessage(text);
-    chatInput.value = "";
+      // پیام کاربر
+      addMessage(text, "user");
 
-    askMentor(text, {
-      creative: creativeLevelEl.value,
-      maxTokens: maxTokensSelect.value
+      // پاک کردن اینپوت
+      userInput.value = "";
+
+      // شبیه‌سازی پاسخ منتور
+      const reply = generateMockReply(text);
+      // یه تاخیر خیلی کوتاه فقط برای حس واقعی‌تر مکالمه
+      setTimeout(() => {
+        addMessage(reply, "assistant");
+      }, 300);
+    }
+
+    // کلیک روی دکمه
+    sendBtn.addEventListener("click", handleSend);
+
+    // اینتر روی کیبورد
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        handleSend();
+      }
     });
-  }
-
-  sendBtn.addEventListener("click", () => handleSend());
-  chatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  });
-
-  settingsBtn.addEventListener("click", () => {
-    drawer.style.display = "flex";
-  });
-
-  drawerCloseBtn.addEventListener("click", () => {
-    drawer.style.display = "none";
-  });
-
-  creativeLevelEl.addEventListener("input", () => {
-    creativeValEl.textContent = creativeLevelEl.value;
-  });
-
-  regenBtn.addEventListener("click", () => {
-    const lastUser = [...history].reverse().find(m => m.role === "user");
-    if (!lastUser) {
-      showToast("سوالی برای بازتولید نداریم 😅");
-      return;
-    }
-    askMentor(lastUser.content, {
-      creative: creativeLevelEl.value,
-      maxTokens: maxTokensSelect.value
-    }, true);
-  });
-
-  copyBtn.addEventListener("click", async () => {
-    if (!lastAssistantRaw) {
-      showToast("هنوز پاسخی نداریم 😅");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(lastAssistantRaw);
-      showToast("کپی شد ✅");
-    } catch {
-      showToast("کپی ناموفق ❗");
-    }
-  });
-
-  exportBtn.addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(history, null, 2)], {
-      type: "application/json;charset=utf-8"
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.download = "chat_export.json";
-    a.href = url;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("فایل آماده شد 💾");
-  });
-
-  clearChatBtn.addEventListener("click", () => {
-    history = [];
-    lastAssistantRaw = "";
-    chatBox.innerHTML = "";
-    showToast("پاک شد ✨");
-  });
-
-  scrollToBottom();
-</script>
-
+  </script>
 </body>
 </html>
